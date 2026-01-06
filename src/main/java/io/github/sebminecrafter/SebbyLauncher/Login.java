@@ -10,8 +10,6 @@ import net.raphimc.minecraftauth.msa.model.MsaDeviceCode;
 import net.raphimc.minecraftauth.msa.service.impl.DeviceCodeMsaAuthService;
 
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -49,7 +47,7 @@ public class Login {
             loginBtn.setToolTipText(code);
             loginBtn.addActionListener(e -> open(URI.create(code)));
 
-            Window.addItem(loginBtn, loginConstraints);
+            addItem(loginBtn, loginConstraints);
         });
 
 
@@ -130,7 +128,7 @@ public class Login {
 
         // Optional: explicitly check for Minecraft products
         return items.asList().stream().anyMatch(e ->
-                e.getAsJsonObject().get("name").getAsString().contains("minecraft")
+                e.getAsJsonObject().get("name").getAsString().toLowerCase().contains("minecraft")
         );
     }
     public static String getMcToken() {
