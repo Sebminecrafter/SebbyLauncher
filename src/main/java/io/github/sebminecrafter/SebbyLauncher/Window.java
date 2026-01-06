@@ -45,10 +45,14 @@ public class Window {
     }
 
     public static void addItem(JComponent comp, GridBagConstraints gbc) {
-        frame.getContentPane().add(comp, gbc);
-        frame.revalidate();
-        frame.repaint();
-        frame.pack();
-        frame.setSize(crWidth, crHeight);
+        javax.swing.SwingUtilities.invokeLater(new Runnable() { // SWING
+            public void run() {
+                Container pane = frame.getContentPane();
+                pane.add(comp, gbc);
+                pane.revalidate();
+                pane.repaint();
+                frame.validate();
+            } // adds the item on AWT thread
+        });
     }
 }

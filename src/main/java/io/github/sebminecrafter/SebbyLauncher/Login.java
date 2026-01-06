@@ -40,6 +40,7 @@ public class Login {
         loginConstraints.anchor = GridBagConstraints.CENTER;
         loginConstraints.fill = GridBagConstraints.HORIZONTAL;
         loginConstraints.weightx = 1;
+        loginConstraints.weighty = 0;
         loginConstraints.insets = new Insets(10, 0, 0, 0);
 
         SwingUtilities.invokeLater(() -> {
