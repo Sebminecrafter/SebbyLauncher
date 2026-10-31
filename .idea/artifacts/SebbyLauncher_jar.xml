@@ -1,8 +1,0 @@
-<component name="ArtifactManager">
-  <artifact type="jar" name="SebbyLauncher:jar">
-    <output-path>$PROJECT_DIR$/out</output-path>
-    <root id="archive" name="SebbyLauncher.jar">
-      <element id="module-output" name="SebbyLauncher" />
-    </root>
-  </artifact>
-</component>

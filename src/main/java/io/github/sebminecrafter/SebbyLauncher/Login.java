@@ -103,18 +103,20 @@ public class Login {
             Main.trace(Arrays.toString(e.getStackTrace()),"SebbyLauncher/Login");
         }
     }
+
     public static boolean ownsMinecraft(String minecraftAccessToken) throws Exception {
         HttpResponse<String> response;
-        try (java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient()) {
+        java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create("https://api.minecraftservices.com/entitlements/mcstore"))
-                    .header("Authorization", "Bearer " + minecraftAccessToken)
-                    .GET()
-                    .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://api.minecraftservices.com/entitlements/mcstore"))
+                .header("Authorization", "Bearer " + minecraftAccessToken)
+                .GET()
+                .build();
 
-            response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        }
+        response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+        client.close();
 
         if (response.statusCode() != 200) {
             return false; // invalid token, expired token, or auth failure
