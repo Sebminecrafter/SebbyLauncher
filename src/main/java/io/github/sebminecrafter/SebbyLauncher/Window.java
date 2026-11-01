@@ -2,22 +2,29 @@ package io.github.sebminecrafter.SebbyLauncher;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.util.concurrent.ExecutionException;
+
 import static io.github.sebminecrafter.SebbyLauncher.GuiHelpers.*;
 import static io.github.sebminecrafter.SebbyLauncher.Main.logger;
 
 public class Window {
-    static JFrame frame = new JFrame("Sebby Launcher");
-    static GridBagConstraints c = new GridBagConstraints();
-    static int crWidth = 1280, crHeight = 720;
-    public static void gui(boolean fullscreen) {
+    private static final JFrame frame = new JFrame("Sebby Launcher");
+    private static final GridBagConstraints c = new GridBagConstraints();
+    private static final String source = "SebbyLauncher/Window";
+    private static final int minWidth = 480;
+    private static final int minHeight = 360;
+
+    public void gui(boolean fullscreen) {
         // Make window
         frame.setLayout(new GridBagLayout());
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setIconImage(new ImageIcon(Main.getAsset("image/Sebby32.png")).getImage());
+        frame.setIconImage(new ImageIcon(Main.getImageAsset("Sebby32.png")).getImage());
         frame.setUndecorated(false);
+        frame.setMinimumSize(new Dimension(minWidth, minHeight));
 
         // Add content
-        ImageIcon logoIcon1 = new ImageIcon(Main.getAsset("image/Sebby64.png")); // load the image to a imageIcon
+        ImageIcon logoIcon1 = new ImageIcon(Main.getImageAsset("Sebby64.png")); // load the image to a imageIcon
         int logoSize = 24;
         ImageIcon logoIcon = scaleIcon(logoIcon1, logoSize, logoSize);
         JLabel logo = new JLabel("Sebby Launcher",logoIcon,SwingConstants.LEFT);
@@ -28,21 +35,57 @@ public class Window {
         c.ipadx = c.ipady = c.gridx = c.gridy = 0;
         c.weightx = c.weighty = 1;
         frame.getContentPane().add(logo, c);
-        ImageIcon playIcon = new ImageIcon(Main.getAsset("image/play1.png"));
+        ImageIcon playIcon = new ImageIcon(Main.getImageAsset("play1.png"));
+        ImageIcon playIcon2 = new ImageIcon(Main.getImageAsset("play2.png"));
         c.gridy= 1;
         JButton launch = new JButton("Play", playIcon);
+        launch.setIcon(playIcon);
+        launch.setPressedIcon(playIcon2);
+        
+        launch.addActionListener(this::onLaunch);
+        
         frame.getContentPane().add(launch, c);
 
         // Display window
         frame.pack();
-        frame.setSize(crWidth, crHeight);
+        frame.setSize(minWidth, minHeight);
         frame.setVisible(true);
         if (fullscreen) frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
     }
 
-    public static void start() {
-        logger.debug("Showing window","SebbyLauncher/Window");
+    public void start() {
+        logger.debug("Showing window", source);
         gui(true);
+    }
+
+    private void onLaunch(ActionEvent e) {
+        logger.debug("Button pressed!", source);
+        JButton button = (JButton) e.getSource();
+        button.setEnabled(false);
+
+        new SwingWorker<Boolean, Void>() {
+            @Override
+            protected Boolean doInBackground() {
+                return Login.attemptLogin();
+            }
+
+            @Override
+            protected void done() {
+                button.setEnabled(true);
+                try {
+                    if (get()) {
+                        logger.info("Login verified.", source);
+                        // start the game here
+                    } else {
+                        logger.error("Login failed.", source);
+                    }
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                } catch (ExecutionException ex) {
+                    logger.error("Login crashed: " + ex.getCause(), source);
+                }
+            }
+        }.execute();
     }
 
     /**
@@ -51,14 +94,13 @@ public class Window {
      * @param gbc {@link GridBagConstraints} to use when adding {@code comp}
      * */
     public static void addItem(JComponent comp, GridBagConstraints gbc) {
-        // SWING
-        // adds the item on AWT thread
+        // adds the component on AWT thread
         SwingUtilities.invokeLater(() -> {
             Container pane = frame.getContentPane();
             pane.add(comp, gbc);
             pane.revalidate();
             pane.repaint();
-            frame.validate();
+            frame.revalidate();
         });
     }
 }
