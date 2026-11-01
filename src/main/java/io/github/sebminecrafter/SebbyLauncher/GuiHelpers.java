@@ -1,11 +1,11 @@
 package io.github.sebminecrafter.SebbyLauncher;
 
-import io.github.sebminecrafter.SebbyLogger.Main;
-
 import javax.swing.*;
 import java.awt.*;
 import java.io.IOException;
 import java.net.URI;
+
+import static io.github.sebminecrafter.SebbyLauncher.Main.logger;
 
 public class GuiHelpers {
     public static void open(URI uri) {
@@ -13,10 +13,10 @@ public class GuiHelpers {
             try {
                 Desktop.getDesktop().browse(uri);
             } catch (IOException e) {
-                Main.error("Failed to open browser.", "SebbyLauncher/GuiHelpers");
+                logger.error("Failed to open browser.", "SebbyLauncher/GuiHelpers");
             }
         } else {
-            Main.error("Desktop not supported.", "SebbyLauncher/GuiHelpers");
+            logger.error("Desktop not supported.", "SebbyLauncher/GuiHelpers");
         }
     }
 

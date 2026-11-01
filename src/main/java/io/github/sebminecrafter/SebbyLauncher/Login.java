@@ -17,22 +17,21 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 
-import io.github.sebminecrafter.SebbyLogger.Main;
-
 import javax.swing.*;
 
 import static io.github.sebminecrafter.SebbyLauncher.GuiHelpers.open;
+import static io.github.sebminecrafter.SebbyLauncher.Main.logger;
 import static io.github.sebminecrafter.SebbyLauncher.Window.addItem;
 
 
 public class Login {
     static File tokenFile = new File("tokens.json");
     static String code;
+
     private static void addLoginButton(String code) {
         GridBagConstraints loginConstraints = new GridBagConstraints();
         loginConstraints.gridx = 0; // same column as other buttons
@@ -46,13 +45,13 @@ public class Login {
         SwingUtilities.invokeLater(() -> {
             JButton loginBtn = new JButton("Login");
             loginBtn.setToolTipText(code);
-            loginBtn.addActionListener(e -> open(URI.create(code)));
+            loginBtn.addActionListener(_ -> open(URI.create(code)));
 
             addItem(loginBtn, loginConstraints);
         });
 
 
-        Main.debug("Button added?", "SebbyLauncher/Login");
+        logger.debug("Button added?", "SebbyLauncher/Login");
     }
     public static boolean existingLogin() {
         try (FileReader reader = new FileReader(tokenFile)) {
@@ -64,7 +63,7 @@ public class Login {
 
             return true;
         } catch (IOException | IllegalStateException e) {
-            Main.error("No existing credentials or error accessing file.","SebbyLauncher/Login");
+            logger.error("No existing credentials or error accessing file.","SebbyLauncher/Login");
             return false;
         }
     }
@@ -72,51 +71,51 @@ public class Login {
         String userAgent = "MinecraftAuth/5.0.0";
         HttpClient httpClient = MinecraftAuth.createHttpClient(userAgent);
         JavaAuthManager.Builder authManagerBuilder = JavaAuthManager.create(httpClient);
-        JavaAuthManager authManager = null;
+        JavaAuthManager authManager;
         try {
             authManager = authManagerBuilder.login(DeviceCodeMsaAuthService::new, (Consumer<MsaDeviceCode>) deviceCode -> {
                 code = deviceCode.getDirectVerificationUri();
-                Main.info("Login code: " + code, "SebbyLauncher/Login");
+                logger.info("Login code: " + code, "SebbyLauncher/Login");
             });
         } catch (IOException | InterruptedException | TimeoutException e) {
-            Main.error("Failed to generate login code! Stack trace:","SebbyLauncher/Login");
-            Main.trace(Arrays.toString(e.getStackTrace()),"SebbyLauncher/Login");
+            logger.error("Failed to generate login code! Stack trace:","SebbyLauncher/Login");
+            logger.trace(Arrays.toString(e.getStackTrace()),"SebbyLauncher/Login");
+            return;
         }
         addLoginButton(code);
         try {
-            Main.debug("Username: " + authManager.getMinecraftProfile().getUpToDate().getName(),"SebbyLauncher/Login");
+            logger.debug("Username: " + authManager.getMinecraftProfile().getUpToDate().getName(),"SebbyLauncher/Login");
         } catch (IOException e) {
-            Main.error("Failed to obtain username. Stack trace:","SebbyLauncher/Login");
-            Main.trace(Arrays.toString(e.getStackTrace()),"SebbyLauncher/Login");
+            logger.error("Failed to obtain username. Stack trace:","SebbyLauncher/Login");
+            logger.trace(Arrays.toString(e.getStackTrace()),"SebbyLauncher/Login");
         }
         try {
-            Main.debug("Access token: " + authManager.getMinecraftToken().getUpToDate().getToken(), "SebbyLauncher/Login");
+            logger.debug("Access token: " + authManager.getMinecraftToken().getUpToDate().getToken(), "SebbyLauncher/Login");
         } catch (IOException e) {
-            Main.error("Failed to get access token. Stack trace:","SebbyLauncher/Login");
-            Main.trace(Arrays.toString(e.getStackTrace()),"SebbyLauncher/Login");
+            logger.error("Failed to get access token. Stack trace:","SebbyLauncher/Login");
+            logger.trace(Arrays.toString(e.getStackTrace()),"SebbyLauncher/Login");
         }
         try (FileWriter file = new FileWriter(tokenFile)) {
-            Files.writeString(tokenFile.toPath(), JavaAuthManager.toJson(authManager).toString());
-            Main.info("JSON file saved successfully.","SebbyLauncher/Login");
+            file.write(JavaAuthManager.toJson(authManager).toString());
+            logger.info("JSON file saved successfully.","SebbyLauncher/Login");
         } catch (IOException e) {
-            Main.error("Failed to save JSON login. Stack trace:","SebbyLauncher/Login");
-            Main.trace(Arrays.toString(e.getStackTrace()),"SebbyLauncher/Login");
+            logger.error("Failed to save JSON login. Stack trace:","SebbyLauncher/Login");
+            logger.trace(Arrays.toString(e.getStackTrace()),"SebbyLauncher/Login");
         }
     }
 
     public static boolean ownsMinecraft(String minecraftAccessToken) throws Exception {
         HttpResponse<String> response;
-        java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+        try (java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient()) {
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://api.minecraftservices.com/entitlements/mcstore"))
-                .header("Authorization", "Bearer " + minecraftAccessToken)
-                .GET()
-                .build();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.minecraftservices.com/entitlements/mcstore"))
+                    .header("Authorization", "Bearer " + minecraftAccessToken)
+                    .GET()
+                    .build();
 
-        response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-        client.close();
+            response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        }
 
         if (response.statusCode() != 200) {
             return false; // invalid token, expired token, or auth failure
@@ -136,7 +135,7 @@ public class Login {
     }
     public static String getMcToken() {
         String token = null;
-        JavaAuthManager authManager = null;
+        JavaAuthManager authManager;
         try (FileReader reader = new FileReader(tokenFile)) {
             String userAgent = "MinecraftAuth/5.0.0";
             HttpClient httpClient = MinecraftAuth.createHttpClient(userAgent);
@@ -144,26 +143,27 @@ public class Login {
             JsonObject jsonObject = JsonParser.parseReader(reader).getAsJsonObject();
             authManager = JavaAuthManager.fromJson(httpClient, jsonObject);
         } catch (IOException | IllegalStateException e) {
-            Main.error("No existing credentials or error accessing file.", "SebbyLauncher/Login");
+            logger.error("No existing credentials or error accessing file.", "SebbyLauncher/Login");
+            return null;
         }
         try {
             token = authManager.getMinecraftToken().getUpToDate().getToken();
         } catch (IOException e) {
-            Main.error("SebbyLauncher/Login", "Error getting MC token, stack trace:");
-            Main.trace("SebbyLauncher/Login", Arrays.toString(e.getStackTrace()));
+            logger.error("SebbyLauncher/Login", "Error getting MC token, stack trace:");
+            logger.trace("SebbyLauncher/Login", Arrays.toString(e.getStackTrace()));
         }
         return token;
     }
+
     public static void attemptLogin() {
         if (!existingLogin()) login();
         try {
             if (!ownsMinecraft(getMcToken())) {
-                Main.error("Couldn't verify game ownership!", "SebbyLauncher/Login");
-                Main.formatMessage("YOU DON'T OWN THE GAME!", "SebbyLauncher/Login", "STOP", "RED_BOLD_BRIGHT");
+                logger.error("Couldn't verify game ownership!", "SebbyLauncher/Login");
                 System.exit(0);
             }
         } catch (Exception e) {
-            Main.error(e.toString(), "SebbyLauncher/Login");
+            logger.error(e.toString(), "SebbyLauncher/Login");
         }
     }
 }

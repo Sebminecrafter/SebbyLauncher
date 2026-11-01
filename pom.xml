@@ -8,7 +8,7 @@
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
-            <version>2.15.0</version>
+            <version>2.14.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -17,15 +17,21 @@
             <version>5.0.2</version>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>io.github.sebminecrafter</groupId>
+            <artifactId>sebbylogger</artifactId>
+            <version>1.0.0</version>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.16.0</version>
                 <configuration>
-                    <source>11</source>
-                    <target>11</target>
+                    <source>25</source>
+                    <target>25</target>
                 </configuration>
             </plugin>
         </plugins>

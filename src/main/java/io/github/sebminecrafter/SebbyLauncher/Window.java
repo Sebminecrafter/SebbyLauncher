@@ -3,6 +3,7 @@ package io.github.sebminecrafter.SebbyLauncher;
 import javax.swing.*;
 import java.awt.*;
 import static io.github.sebminecrafter.SebbyLauncher.GuiHelpers.*;
+import static io.github.sebminecrafter.SebbyLauncher.Main.logger;
 
 public class Window {
     static JFrame frame = new JFrame("Sebby Launcher");
@@ -40,19 +41,24 @@ public class Window {
     }
 
     public static void start() {
-        io.github.sebminecrafter.SebbyLogger.Main.debug("Showing window","SebbyLauncher/Window");
+        logger.debug("Showing window","SebbyLauncher/Window");
         gui(true);
     }
 
+    /**
+     * Adds an item to the main pane on the AWT thread using the given component and constraints
+     * @param comp {@link JComponent} to add to the pane
+     * @param gbc {@link GridBagConstraints} to use when adding {@code comp}
+     * */
     public static void addItem(JComponent comp, GridBagConstraints gbc) {
-        javax.swing.SwingUtilities.invokeLater(new Runnable() { // SWING
-            public void run() {
-                Container pane = frame.getContentPane();
-                pane.add(comp, gbc);
-                pane.revalidate();
-                pane.repaint();
-                frame.validate();
-            } // adds the item on AWT thread
+        // SWING
+        // adds the item on AWT thread
+        SwingUtilities.invokeLater(() -> {
+            Container pane = frame.getContentPane();
+            pane.add(comp, gbc);
+            pane.revalidate();
+            pane.repaint();
+            frame.validate();
         });
     }
 }
