@@ -1,11 +1,11 @@
-package io.github.sebminecrafter.SebbyLauncher;
+package io.github.sebminecrafter.sebbylauncher;
 
 import javax.swing.*;
 import java.awt.*;
 import java.io.IOException;
 import java.net.URI;
 
-import static io.github.sebminecrafter.SebbyLauncher.Main.logger;
+import static io.github.sebminecrafter.sebbylauncher.Main.logger;
 
 public class GuiHelpers {
     public static void open(URI uri) {

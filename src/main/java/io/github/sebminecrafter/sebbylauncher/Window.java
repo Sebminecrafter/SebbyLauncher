@@ -1,12 +1,12 @@
-package io.github.sebminecrafter.SebbyLauncher;
+package io.github.sebminecrafter.sebbylauncher;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.util.concurrent.ExecutionException;
 
-import static io.github.sebminecrafter.SebbyLauncher.GuiHelpers.*;
-import static io.github.sebminecrafter.SebbyLauncher.Main.logger;
+import static io.github.sebminecrafter.sebbylauncher.GuiHelpers.*;
+import static io.github.sebminecrafter.sebbylauncher.Main.logger;
 
 public class Window {
     private static final JFrame frame = new JFrame("Sebby Launcher");

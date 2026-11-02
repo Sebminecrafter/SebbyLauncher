@@ -1,4 +1,4 @@
-package io.github.sebminecrafter.SebbyLauncher;
+package io.github.sebminecrafter.sebbylauncher;
 
 import io.github.sebminecrafter.sebbylogger.Logger;
 

@@ -1,3 +1,3 @@
 Manifest-Version: 1.0
-Main-Class: io.github.sebminecrafter.SebbyLauncher.Main
+Main-Class: io.github.sebminecrafter.sebbylauncher.Main
 

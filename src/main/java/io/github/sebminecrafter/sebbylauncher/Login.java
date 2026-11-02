@@ -1,4 +1,4 @@
-package io.github.sebminecrafter.SebbyLauncher;
+package io.github.sebminecrafter.sebbylauncher;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -28,9 +28,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
-import static io.github.sebminecrafter.SebbyLauncher.GuiHelpers.open;
-import static io.github.sebminecrafter.SebbyLauncher.Main.logger;
-import static io.github.sebminecrafter.SebbyLauncher.Window.addItem;
+import static io.github.sebminecrafter.sebbylauncher.GuiHelpers.open;
+import static io.github.sebminecrafter.sebbylauncher.Main.logger;
+import static io.github.sebminecrafter.sebbylauncher.Window.addItem;
 
 public class Login {
     private static final String USER_AGENT = "MinecraftAuth/5.0.0";
