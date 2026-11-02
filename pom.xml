@@ -61,17 +61,13 @@
     <build>
         <resources>
             <resource>
-                <directory>src/main/resources</directory>
+                <directory>src/main/resources/assets/text</directory>
                 <filtering>true</filtering>
-                <excludes>
-                    <exclude>**/*.png</exclude>
-                    <exclude>**/*.jar</exclude>
-                    <exclude>**/*.jp[e]g</exclude>
-                    <exclude>**/*.bin</exclude>
-                    <exclude>**/*.class</exclude>
-                </excludes>
             </resource>
-
+            <resource>
+                <directory>src/main/resources/assets/image</directory>
+                <filtering>false</filtering>
+            </resource>
         </resources>
 
         <plugins>

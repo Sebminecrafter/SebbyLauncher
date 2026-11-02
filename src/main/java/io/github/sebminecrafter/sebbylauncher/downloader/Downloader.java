@@ -12,13 +12,22 @@ import java.nio.file.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @SuppressWarnings("unused")
 public class Downloader {
     private static final String MANIFEST_URL = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
     private static final Logger logger = new Logger("SebbyLauncher/Downloader");
+    private static final String RESOURCES_URL = "https://resources.download.minecraft.net/";
+    private static final int ASSET_THREADS = 16;
     private static final Gson GSON = new Gson();
 
     private JsonObject manifestCache;
@@ -46,7 +55,7 @@ public class Downloader {
     }
 
     /**
-     * Downloads the client JAR and libraries for the given version ID.
+     * Downloads the client JAR, libraries, and assets for the given version ID.
      *
      * @param version One of the strings returned by listVersions()
      * @return true on success, false on failure/invalid version
@@ -62,6 +71,7 @@ public class Downloader {
 
             downloadVerified(client.url(), outputJar, client.sha1());
             downloadLibraries(meta);
+            downloadAssets(meta);
 
             logger.info("Download complete: " + outputJar.toAbsolutePath());
             return true;
@@ -122,6 +132,68 @@ public class Downloader {
     }
 
     /**
+     * Downloads the asset index and every asset it lists that is missing or the wrong size.
+     * Files are downloaded in parallel.
+     */
+    public void downloadAssets(VersionMeta meta) throws IOException {
+        VersionMeta.AssetIndexRef ref = meta.assetIndex();
+        if (ref == null) return;
+
+        Path indexFile = LauncherDirs.ASSETS.resolve("indexes").resolve(ref.id() + ".json");
+        downloadVerified(ref.url(), indexFile, ref.sha1());
+
+        AssetIndex index;
+        try (Reader reader = Files.newBufferedReader(indexFile)) {
+            index = GSON.fromJson(reader, AssetIndex.class);
+        }
+        if (index.virtual() || index.mapToResources()) {
+            logger.warn("Legacy asset layout is not supported yet: " + ref.id());
+        }
+
+        // several names can share one file, so dedupe by hash
+        Map<String, AssetIndex.AssetObject> unique = new HashMap<>();
+        for (AssetIndex.AssetObject obj : index.objects().values()) unique.putIfAbsent(obj.hash(), obj);
+
+        List<AssetIndex.AssetObject> missing = new ArrayList<>();
+        for (AssetIndex.AssetObject obj : unique.values()) {
+            Path file = assetPath(obj.hash());
+            if (!Files.isRegularFile(file) || Files.size(file) != obj.size()) missing.add(obj);
+        }
+
+        logger.info("Assets: " + missing.size() + " of " + unique.size() + " to download");
+        if (missing.isEmpty()) return;
+
+        AtomicInteger done = new AtomicInteger();
+        List<Future<Void>> tasks = new ArrayList<>();
+        try (ExecutorService pool = Executors.newFixedThreadPool(ASSET_THREADS)) {
+            for (AssetIndex.AssetObject obj : missing) {
+                tasks.add(pool.submit(() -> {
+                    String hash = obj.hash();
+                    downloadVerified(RESOURCES_URL + hash.substring(0, 2) + "/" + hash, assetPath(hash), hash);
+                    int n = done.incrementAndGet();
+                    if (n % 250 == 0) logger.info("Assets: " + n + "/" + missing.size());
+                    return null;
+                }));
+            }
+        }
+
+        int failed = 0;
+        for (Future<Void> task : tasks) {
+            try {
+                task.get();
+            } catch (ExecutionException e) {
+                failed++;
+                logger.error("Asset failed: " + e.getCause().getMessage());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while downloading assets", e);
+            }
+        }
+        if (failed > 0) throw new IOException(failed + " assets failed to download");
+        logger.info("Assets ready: " + unique.size());
+    }
+
+    /**
      * Returns the latest Minecraft version.
      *
      * @param snapshot if true, returns latest snapshot; otherwise latest release
@@ -153,6 +225,10 @@ public class Downloader {
             if (obj.get("id").getAsString().equals(version)) return obj;
         }
         return null;
+    }
+
+    private static Path assetPath(String hash) {
+        return LauncherDirs.ASSETS.resolve("objects").resolve(hash.substring(0, 2)).resolve(hash);
     }
 
     private static String sha1(Path file) throws IOException {
