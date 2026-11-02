@@ -33,7 +33,6 @@ import static io.github.sebminecrafter.SebbyLauncher.Main.logger;
 import static io.github.sebminecrafter.SebbyLauncher.Window.addItem;
 
 public class Login {
-    private static final String TAG = "SebbyLauncher/Login";
     private static final String USER_AGENT = "MinecraftAuth/5.0.0";
     private static final String ENTITLEMENTS_URL = "https://api.minecraftservices.com/entitlements/mcstore";
 
@@ -42,11 +41,28 @@ public class Login {
 
     static final File tokenFile = new File("tokens.json");
 
+    /**
+     * Prevent instantiation
+     */
+    public Login() {
+        throw new UnsupportedOperationException(
+                "Cannot be instantiated."
+        );
+    }
+
+    /**
+     * Check whether an existing login token already exists and can be used.
+     * @return a boolean value of whether there is an existing login (valid token) already.
+     */
     public static boolean existingLogin() {
         if (authManager == null) authManager = loadSavedLogin();
         return authManager != null;
     }
 
+    /**
+     * Adds a login button and attempts a login
+     * @return a boolean on whether the login was successful
+     */
     public static boolean login() {
         AtomicReference<JButton> loginButton = new AtomicReference<>();
 
@@ -55,7 +71,7 @@ public class Login {
                     DeviceCodeMsaAuthService::new,
                     (Consumer<MsaDeviceCode>) deviceCode -> {
                         String url = deviceCode.getDirectVerificationUri();
-                        logger.info("Login URL: " + url, TAG);
+                        logger.info("Login URL: " + url, "SebbyLauncher/Login");
                         loginButton.set(showLoginButton(url));
                     });
         } catch (IOException | TimeoutException e) {
@@ -74,6 +90,10 @@ public class Login {
         return true;
     }
 
+    /**
+     * Gets a Minecraft token if there is an existing login
+     * @return the Minecraft token as a {@link String} if it exists, {@code null} otherwise
+     */
     public static String getMcToken() {
         if (!existingLogin()) return null;
 
@@ -87,6 +107,13 @@ public class Login {
         }
     }
 
+    /**
+     * Check whether a user (token) owns Minecraft
+     * @param accessToken a valid access token for a Minecraft account
+     * @return a boolean on whether the token owns a Minecraft account
+     * @throws IOException when an http request or file operation fails
+     * @throws InterruptedException when an http request is interrupted
+     */
     public static boolean ownsMinecraft(String accessToken) throws IOException, InterruptedException {
         if (accessToken == null) return false;
 
@@ -110,6 +137,10 @@ public class Login {
         return false;
     }
 
+    /**
+     * Attempts to log in to a Minecraft account
+     * @return true if the login was successful, false otherwise
+     */
     public static boolean attemptLogin() {
         String token = existingLogin() ? getMcToken() : null;
         if (token == null && login()) token = getMcToken();
@@ -117,7 +148,7 @@ public class Login {
 
         try {
             if (ownsMinecraft(token)) return true;
-            logger.error("Couldn't verify game ownership!", TAG);
+            logError("Couldn't verify game ownership!", null);
         } catch (IOException e) {
             logError("Failed to check game ownership.", e);
         } catch (InterruptedException e) {
@@ -127,11 +158,21 @@ public class Login {
         return false;
     }    private static JavaAuthManager authManager;
 
+    /**
+     * Log an error
+     * @param message the message to log with the error
+     * @param e the exception
+     */
     private static void logError(String message, Exception e) {
-        logger.error(message, TAG);
-        logger.trace(Arrays.toString(e.getStackTrace()), TAG);
+        if (message != null) logger.error(message, "SebbyLauncher/Login");
+        if (e != null) logger.trace(Arrays.toString(e.getStackTrace()), "SebbyLauncher/Login");
     }
 
+    /**
+     * Adds a login button to the window
+     * @param url the login url that the button should open
+     * @return the created {@link JButton} instance
+     */
     private static JButton showLoginButton(String url) {
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.gridx = 0;
@@ -149,6 +190,10 @@ public class Login {
         return button;
     }
 
+    /**
+     * Attempts to load an existing saved login using the tokens file
+     * @return a {@link JavaAuthManager} for the saved login, or {@code null} if it failed
+     */
     private static JavaAuthManager loadSavedLogin() {
         if (!tokenFile.isFile()) return null;
 
@@ -161,6 +206,10 @@ public class Login {
         }
     }
 
+    /**
+     * Save login tokens to file
+     * @param manager a valid {@link JavaAuthManager} to save the token of
+     */
     private static void saveLogin(JavaAuthManager manager) {
         try (Writer writer = Files.newBufferedWriter(tokenFile.toPath())) {
             writer.write(JavaAuthManager.toJson(manager).toString());

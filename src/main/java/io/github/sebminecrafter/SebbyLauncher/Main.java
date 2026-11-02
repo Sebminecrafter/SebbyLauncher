@@ -6,7 +6,7 @@ import java.net.URL;
 import java.util.Arrays;
 
 public class Main {
-    final static Logger logger = new Logger();
+    final static Logger logger = new Logger("SebbyLauncher", true);
 
     public static final Window window = new Window();
 
@@ -29,9 +29,9 @@ public class Main {
     }
 
     private static void startupMessage() {
-        logger.info("SebbyLauncher started.     ","SebbyLauncher/Main");
-        logger.info("   --- SebbyLauncher ---   ","SebbyLauncher/Main");
-        logger.info("An epic Minecraft launcher ","SebbyLauncher/Main");
-        logger.info("Made by Sebminecrafter     ","SebbyLauncher/Main");
+        logger.info("SebbyLauncher started.     ");
+        logger.info("   --- SebbyLauncher ---   ");
+        logger.info("An epic Minecraft launcher ");
+        logger.info("Made by Sebminecrafter     ");
     }
 }

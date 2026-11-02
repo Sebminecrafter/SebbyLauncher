@@ -59,7 +59,7 @@ public class Window {
     }
 
     private void onLaunch(ActionEvent e) {
-        logger.debug("Button pressed!", source);
+        logger.debug("Play button pressed", source);
         JButton button = (JButton) e.getSource();
         button.setEnabled(false);
 
@@ -75,7 +75,7 @@ public class Window {
                 try {
                     if (get()) {
                         logger.info("Login verified.", source);
-                        // start the game here
+                        new Launcher();
                     } else {
                         logger.error("Login failed.", source);
                     }
