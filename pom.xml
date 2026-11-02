@@ -60,13 +60,22 @@
 
     <build>
         <resources>
+            <!-- Filter everything except images -->
             <resource>
-                <directory>src/main/resources/assets/text</directory>
+                <directory>src/main/resources</directory>
                 <filtering>true</filtering>
+                <excludes>
+                    <exclude>assets/image/**</exclude>
+                </excludes>
             </resource>
+
+            <!-- Still copy images -->
             <resource>
-                <directory>src/main/resources/assets/image</directory>
+                <directory>src/main/resources</directory>
                 <filtering>false</filtering>
+                <includes>
+                    <include>assets/image/**</include>
+                </includes>
             </resource>
         </resources>
 
