@@ -4,16 +4,16 @@ import com.google.gson.*;
 
 import java.io.*;
 import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
 
 import static io.github.sebminecrafter.SebbyLauncher.Main.logger;
 
+@SuppressWarnings("unused")
 public class Downloader {
-
-    private static final String SOURCE = "DownloadMinecraft";
     private static final String MANIFEST_URL = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
 
     private JsonObject manifestCache;
@@ -31,11 +31,11 @@ public class Downloader {
                 result.add(e.getAsJsonObject().get("id").getAsString());
             }
 
-            logger.info("Found " + result.size() + " versions", SOURCE);
+            logger.info("Found " + result.size() + " versions");
             return result.toArray(new String[0]);
 
         } catch (Exception e) {
-            logger.error("Failed to list versions: " + e.getMessage(), SOURCE);
+            logger.error("Failed to list versions: " + e.getMessage());
             return new String[0];
         }
     }
@@ -44,7 +44,7 @@ public class Downloader {
      * Downloads the client JAR for the given version ID.
      *
      * @param version One of the strings returned by listVersions()
-     * @return true on success, false on failure or invalid version
+     * @return true on success, false on failure/invalid version
      */
     public boolean downloadVersion(String version) {
         try {
@@ -61,14 +61,18 @@ public class Downloader {
             }
 
             if (versionEntry == null) {
-                logger.error("Invalid Minecraft version: " + version, SOURCE);
+                logger.error("Invalid Minecraft version: " + version);
                 return false;
             }
 
             String versionJsonUrl = versionEntry.get("url").getAsString();
-            logger.debug("Fetching version JSON: " + versionJsonUrl, SOURCE);
+            logger.debug("Fetching version JSON: " + versionJsonUrl);
 
             JsonObject versionJson = readJsonFromUrl(versionJsonUrl);
+
+            if (versionJson == null) {
+                return false;
+            }
 
             String clientUrl = versionJson
                     .getAsJsonObject("downloads")
@@ -76,19 +80,19 @@ public class Downloader {
                     .get("url")
                     .getAsString();
 
-            Path outputDir = Paths.get("minecraft", "versions", version);
+            Path outputDir = LauncherDirs.VERSIONS.resolve(version);
             Files.createDirectories(outputDir);
 
             Path outputJar = outputDir.resolve(version + ".jar");
-            logger.info("Downloading " + version + " client.jar", SOURCE);
+            logger.info("Downloading " + version + " client.jar");
 
             downloadFile(clientUrl, outputJar);
 
-            logger.info("Download complete: " + outputJar.toAbsolutePath(), SOURCE);
+            logger.info("Download complete: " + outputJar.toAbsolutePath());
             return true;
 
         } catch (Exception e) {
-            logger.error("Download failed: " + e.getMessage(), SOURCE);
+            logger.error("Download failed: " + e.getMessage());
             return false;
         }
     }
@@ -109,27 +113,32 @@ public class Downloader {
                     : latest.get("release").getAsString();
 
             logger.info(
-                    "Latest Minecraft " + (snapshot ? "snapshot" : "release") + ": " + version,
-                    SOURCE
+                    "Latest Minecraft " + (snapshot ? "snapshot" : "release") + ": " + version
             );
 
             return version;
         } catch (Exception e) {
-            logger.error("Failed to get latest version: " + e.getMessage(), SOURCE);
+            logger.error("Failed to get latest version: " + e.getMessage());
             return null;
         }
     }
 
     private JsonObject getManifest() throws IOException {
         if (manifestCache == null) {
-            logger.debug("Fetching version manifest", SOURCE);
+            logger.debug("Fetching version manifest");
             manifestCache = readJsonFromUrl(MANIFEST_URL);
         }
         return manifestCache;
     }
 
     private JsonObject readJsonFromUrl(String urlStr) throws IOException {
-        HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+        HttpURLConnection conn;
+        try {
+            conn = (HttpURLConnection) new URI(urlStr).toURL().openConnection();
+        } catch (URISyntaxException e) {
+            logger.trace("Failed to open connection to download! Error: " + e.getMessage());
+            return null;
+        }
         conn.setRequestMethod("GET");
         conn.setConnectTimeout(15000);
         conn.setReadTimeout(15000);
@@ -141,7 +150,13 @@ public class Downloader {
     }
 
     private void downloadFile(String urlStr, Path output) throws IOException {
-        HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+        HttpURLConnection conn;
+        try {
+            conn = (HttpURLConnection) new URI(urlStr).toURL().openConnection();
+        } catch (URISyntaxException e) {
+            logger.trace("Failed to open connection to download! Error: " + e.getMessage());
+            return;
+        }
         conn.setRequestMethod("GET");
         conn.setConnectTimeout(15000);
         conn.setReadTimeout(15000);

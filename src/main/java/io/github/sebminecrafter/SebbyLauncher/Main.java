@@ -12,6 +12,7 @@ public class Main {
 
     static void main(String[] args) {
         if (!Arrays.asList(args).contains("nologo")) startupMessage();
+        LauncherDirs.init();
         // Run GUI
         javax.swing.SwingUtilities.invokeLater(window::start);
     }
@@ -24,11 +25,12 @@ public class Main {
 
     public static URL getImageAsset(String path) {
         URL result = getAsset("image/" + path);
-        if (result == null) result = getAsset("/assets/image/missing.png");
+        if (result == null) result = getAsset("image/missing.png");
         return result;
     }
 
     private static void startupMessage() {
+        io.github.sebminecrafter.sebbylogger.Utils.printVersion();
         logger.info("SebbyLauncher started.     ");
         logger.info("   --- SebbyLauncher ---   ");
         logger.info("An epic Minecraft launcher ");

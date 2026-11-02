@@ -39,7 +39,7 @@ public class Login {
     private static final HttpClient AUTH_CLIENT = MinecraftAuth.createHttpClient(USER_AGENT);
     private static final java.net.http.HttpClient HTTP = java.net.http.HttpClient.newHttpClient();
 
-    static final File tokenFile = new File("tokens.json");
+    static final File tokenFile = LauncherDirs.TOKENS.resolve("tokens.json").toFile();
 
     /**
      * Prevent instantiation

@@ -1,0 +1,42 @@
+package io.github.sebminecrafter.SebbyLauncher;
+
+import io.github.sebminecrafter.sebbylogger.Logger;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+public final class LauncherDirs {
+    public static final Path ROOT = Path.of(System.getProperty("user.home"), "SebbyLauncher");
+    public static final Path TOKENS = ROOT.resolve("tokens");
+    public static final Path VERSIONS = ROOT.resolve("versions");
+    public static final Path LIBRARIES = ROOT.resolve("libraries");
+    public static final Path INSTANCES = ROOT.resolve("instances");
+    private static final Path[] paths = {ROOT, TOKENS, VERSIONS, LIBRARIES, INSTANCES};
+
+    /**
+     * Prevent instantiation
+     */
+    public LauncherDirs() {
+        throw new UnsupportedOperationException(
+                "Cannot be instantiated."
+        );
+    }
+
+    /**
+     * Creates directories
+     */
+    public static void init() {
+        Logger logger = new Logger("SebbyLauncher/LauncherDirs");
+        logger.info("Creating Directories...");
+
+        for (Path path : paths) {
+            if (path.toFile().isDirectory()) continue;
+            try {
+                Files.createDirectories(path);
+            } catch (IOException e) {
+                logger.trace("Failed to create directory: "+path.toAbsolutePath());
+            }
+        }
+    }
+}
