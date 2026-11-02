@@ -12,12 +12,13 @@ public final class LauncherDirs {
     public static final Path VERSIONS = ROOT.resolve("versions");
     public static final Path LIBRARIES = ROOT.resolve("libraries");
     public static final Path INSTANCES = ROOT.resolve("instances");
-    private static final Path[] paths = {ROOT, TOKENS, VERSIONS, LIBRARIES, INSTANCES};
+    public static final Path ASSETS = ROOT.resolve("assets");
+    private static final Path[] paths = {ROOT, TOKENS, VERSIONS, LIBRARIES, INSTANCES, ASSETS};
 
     /**
      * Prevent instantiation
      */
-    public LauncherDirs() {
+    private LauncherDirs() {
         throw new UnsupportedOperationException(
                 "Cannot be instantiated."
         );
@@ -35,7 +36,8 @@ public final class LauncherDirs {
             try {
                 Files.createDirectories(path);
             } catch (IOException e) {
-                logger.trace("Failed to create directory: "+path.toAbsolutePath());
+                logger.error("Failed to create directory: " + path.toAbsolutePath());
+                logger.trace(e.getMessage());
             }
         }
     }

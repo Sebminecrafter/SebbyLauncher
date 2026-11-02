@@ -6,7 +6,7 @@ import java.net.URL;
 import java.util.Arrays;
 
 public class Main {
-    final static Logger logger = new Logger("SebbyLauncher", true);
+    final static Logger logger = new Logger("SebbyLauncher");
 
     public static final Window window = new Window();
 

@@ -1,6 +1,8 @@
-package io.github.sebminecrafter.SebbyLauncher;
+package io.github.sebminecrafter.SebbyLauncher.Downloader;
 
 import com.google.gson.*;
+import io.github.sebminecrafter.SebbyLauncher.LauncherDirs;
+import io.github.sebminecrafter.sebbylogger.Logger;
 
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -10,11 +12,10 @@ import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
 
-import static io.github.sebminecrafter.SebbyLauncher.Main.logger;
-
 @SuppressWarnings("unused")
 public class Downloader {
     private static final String MANIFEST_URL = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
+    private static final Logger logger = new Logger("SebbyLauncher/Downloader");
 
     private JsonObject manifestCache;
 
@@ -71,6 +72,7 @@ public class Downloader {
             JsonObject versionJson = readJsonFromUrl(versionJsonUrl);
 
             if (versionJson == null) {
+
                 return false;
             }
 
@@ -123,6 +125,18 @@ public class Downloader {
         }
     }
 
+    private HttpURLConnection open(String urlStr) throws IOException {
+        try {
+            HttpURLConnection conn = (HttpURLConnection) new URI(urlStr).toURL().openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            return conn;
+        } catch (URISyntaxException e) {
+            throw new IOException("Bad URL: " + urlStr, e);
+        }
+    }
+
     private JsonObject getManifest() throws IOException {
         if (manifestCache == null) {
             logger.debug("Fetching version manifest");
@@ -132,16 +146,7 @@ public class Downloader {
     }
 
     private JsonObject readJsonFromUrl(String urlStr) throws IOException {
-        HttpURLConnection conn;
-        try {
-            conn = (HttpURLConnection) new URI(urlStr).toURL().openConnection();
-        } catch (URISyntaxException e) {
-            logger.trace("Failed to open connection to download! Error: " + e.getMessage());
-            return null;
-        }
-        conn.setRequestMethod("GET");
-        conn.setConnectTimeout(15000);
-        conn.setReadTimeout(15000);
+        HttpURLConnection conn = open(urlStr);
 
         try (InputStream in = conn.getInputStream();
              Reader reader = new InputStreamReader(in)) {
@@ -150,16 +155,7 @@ public class Downloader {
     }
 
     private void downloadFile(String urlStr, Path output) throws IOException {
-        HttpURLConnection conn;
-        try {
-            conn = (HttpURLConnection) new URI(urlStr).toURL().openConnection();
-        } catch (URISyntaxException e) {
-            logger.trace("Failed to open connection to download! Error: " + e.getMessage());
-            return;
-        }
-        conn.setRequestMethod("GET");
-        conn.setConnectTimeout(15000);
-        conn.setReadTimeout(15000);
+        HttpURLConnection conn = open(urlStr);
 
         try (InputStream in = conn.getInputStream()) {
             Files.copy(in, output, StandardCopyOption.REPLACE_EXISTING);
