@@ -15,6 +15,12 @@ public class Window {
     private static final int minWidth = 480;
     private static final int minHeight = 360;
 
+    // TODO: Improve layout, separate into two panes (small left top to bottom, big right selection screen(s), like official mc launcher)
+    // TODO: Add version, mod loader selectors
+    // TODO: Add separate instances
+    // TODO: Add separate profiles/accounts
+    // TODO: Add mod downloading/updating
+
     public void gui(boolean fullscreen) {
         // Make window
         frame.setLayout(new GridBagLayout());
@@ -75,7 +81,8 @@ public class Window {
                 try {
                     if (get()) {
                         logger.info("Login verified.", source);
-                        new Launcher();
+                        Launcher launcher = new Launcher();
+                        launcher.launchGame();
                     } else {
                         logger.error("Login failed.", source);
                     }
