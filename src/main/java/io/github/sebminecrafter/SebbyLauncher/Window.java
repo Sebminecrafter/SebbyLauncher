@@ -18,6 +18,7 @@ public class Window {
     // TODO: Improve layout, separate into two panes (small left top to bottom, big right selection screen(s), like official mc launcher)
     // TODO: Add version, mod loader selectors
     // TODO: Add separate instances
+    // TODO: Use folder in user home (C:\Users\name\SebbyLauncher for Windows or /home/name/SebbyLauncher for Linux/Unix/macOS)
     // TODO: Add separate profiles/accounts
     // TODO: Add mod downloading/updating
 
