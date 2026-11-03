@@ -11,7 +11,11 @@ import static io.github.sebminecrafter.sebbylauncher.GuiHelpers.*;
 
 public class Window {
     private static final JFrame frame = new JFrame("Sebby Launcher");
-    private static final GridBagConstraints c = new GridBagConstraints();
+    private static final CardLayout cards = new CardLayout();
+    private static final JPanel content = new JPanel(cards);
+    private static final JPanel sidebar = new JPanel();
+    private static final ButtonGroup nav = new ButtonGroup();
+
     private static final int minWidth = 480;
     private static final int minHeight = 360;
     private static final Logger logger = new Logger("SebbyLauncher/Window");
@@ -37,6 +41,7 @@ public class Window {
         JLabel logo = new JLabel("Sebby Launcher",logoIcon,SwingConstants.LEFT);
         logo.setToolTipText("Made by Sebminecrafter");
         logo.setFont(new Font("Sans-Serif", Font.PLAIN, logoSize));
+        GridBagConstraints c = new GridBagConstraints();
         c.anchor = GridBagConstraints.FIRST_LINE_START;
         c.fill = GridBagConstraints.HORIZONTAL;
         c.ipadx = c.ipady = c.gridx = c.gridy = 0;
@@ -114,5 +119,14 @@ public class Window {
             pane.repaint();
             frame.revalidate();
         });
+    }
+
+
+    private static void addScreen(String name, JComponent screen) {
+        content.add(screen, name);
+        JToggleButton button = new JToggleButton(name);
+        button.addActionListener(_ -> cards.show(content, name));
+        nav.add(button);
+        sidebar.add(button);
     }
 }
