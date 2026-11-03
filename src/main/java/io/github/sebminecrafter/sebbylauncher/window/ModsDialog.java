@@ -11,12 +11,14 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.AbstractTableModel;
 import java.awt.*;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+import static io.github.sebminecrafter.sebbylauncher.GuiHelpers.openFolder;
 import static io.github.sebminecrafter.sebbylauncher.window.Window.*;
 
 final class ModsDialog {
@@ -90,6 +92,14 @@ final class ModsDialog {
 
         private ContentTab(ContentType type) {
             this.type = type;
+            Path folder = instance.gameDirectory().resolve(type.directoryName());
+            JPanel folderBar = new JPanel(new BorderLayout(8, 0));
+            folderBar.add(new JLabel(folder.toString()), BorderLayout.CENTER);
+            JButton openFolderButton = new JButton("Open folder");
+            openFolderButton.addActionListener(_ -> openFolder(folder, dialog));
+            folderBar.add(openFolderButton, BorderLayout.EAST);
+            panel.add(folderBar, BorderLayout.NORTH);
+
             JTabbedPane views = new JTabbedPane();
             views.addTab("Browse", createBrowsePanel());
             views.addTab("Installed", createInstalledPanel());
@@ -135,8 +145,6 @@ final class ModsDialog {
 
         private JPanel createInstalledPanel() {
             JPanel installed = new JPanel(new BorderLayout(8, 8));
-            installed.add(new JLabel(type.pluralLabel() + " in "
-                    + instance.gameDirectory().resolve(type.directoryName())), BorderLayout.NORTH);
             installedTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
             installedTable.setFillsViewportHeight(true);
             installedTable.setRowHeight(26);
@@ -225,7 +233,7 @@ final class ModsDialog {
         }
 
         private void refreshInstalled() {
-            setActionsEnabled(false);
+            setActionsDisabled();
             new SwingWorker<List<InstalledContent>, Void>() {
                 @Override
                 protected List<InstalledContent> doInBackground() throws Exception {
@@ -306,7 +314,7 @@ final class ModsDialog {
         }
 
         private void runUpdates(List<ContentUpdate> pending) {
-            setActionsEnabled(false);
+            setActionsDisabled();
             status.setText("Updating " + pending.size() + " " + type.pluralLabel() + "…");
             new SwingWorker<Integer, Void>() {
                 @Override
@@ -339,7 +347,7 @@ final class ModsDialog {
                     "Remove " + selected.installed().fileName() + " from this instance?",
                     "Remove " + type.label(), JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
             if (choice != JOptionPane.YES_OPTION) return;
-            setActionsEnabled(false);
+            setActionsDisabled();
             new SwingWorker<Void, Void>() {
                 @Override
                 protected Void doInBackground() throws Exception {
@@ -362,7 +370,7 @@ final class ModsDialog {
         }
 
         private void setEnabled(InstalledContent content, boolean enabled) {
-            setActionsEnabled(false);
+            setActionsDisabled();
             new SwingWorker<Void, Void>() {
                 @Override
                 protected Void doInBackground() throws Exception {
@@ -395,12 +403,12 @@ final class ModsDialog {
             removeButton.setEnabled(selected != null);
         }
 
-        private void setActionsEnabled(boolean enabled) {
-            installedTable.setEnabled(enabled);
-            checkUpdatesButton.setEnabled(enabled && installedModel.getRowCount() > 0);
-            updateSelectedButton.setEnabled(enabled && selectedRow() != null && selectedRow().update() != null);
-            updateAllButton.setEnabled(enabled && !updates.isEmpty());
-            removeButton.setEnabled(enabled && selectedRow() != null);
+        private void setActionsDisabled() {
+            installedTable.setEnabled(false);
+            checkUpdatesButton.setEnabled(false);
+            updateSelectedButton.setEnabled(false);
+            updateAllButton.setEnabled(false);
+            removeButton.setEnabled(false);
         }
 
         private final class InstalledTableModel extends AbstractTableModel {

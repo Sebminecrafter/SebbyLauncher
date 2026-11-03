@@ -84,6 +84,10 @@ public record Instance(String name, String version, String loader, String image,
         return instanceDirectory().resolve("instance.json");
     }
 
+    public Path logoFile() {
+        return instanceDirectory().resolve("logo.png");
+    }
+
     public Path gameDirectory() {
         if (gameFolder == null || gameFolder.isBlank()) {
             return instanceDirectory();

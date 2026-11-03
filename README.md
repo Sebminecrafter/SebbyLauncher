@@ -19,6 +19,8 @@ It features:
 * Mod loaders
 * Selectable Fabric and Quilt loader versions per instance
 * Mod and pack downloading through Modrinth, filtered for an instance's Minecraft version
+* Custom instance images, stored as PNGs in each instance folder
+* Minecraft news rendered in an embedded JavaFX WebView
 
 ### Mods and packs management
 
@@ -26,6 +28,7 @@ Open an instance's **Manage mods & packs** dialog to browse, install, update, en
 resource packs, data packs, and shader packs. Each category has its own tab and uses the corresponding folder
 inside the instance game directory (`mods`, `resourcepacks`, `datapacks`, or `shaderpacks`).
 Installed files are identified directly by their SHA-1 hashes with Modrinth.
+The instance screen and each content category also provide shortcuts to open their folders.
 
 ### Tests
 

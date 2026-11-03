@@ -136,6 +136,9 @@ public final class PlayPage {
         JButton edit = new JButton("Instance settings");
         edit.addActionListener(_ -> openInstanceDialog(instance));
         actions.add(edit);
+        JButton openInstanceFolder = new JButton("Open instance folder");
+        openInstanceFolder.addActionListener(_ -> openFolder(instance.instanceDirectory(), frame));
+        actions.add(openInstanceFolder);
         JButton manageMods = new JButton("Manage mods & packs");
         manageMods.addActionListener(_ -> ModsDialog.open(instance));
         actions.add(manageMods);
@@ -153,12 +156,19 @@ public final class PlayPage {
     }
 
     private static ImageIcon instanceIcon(Instance instance, int size) {
+        if (Files.isRegularFile(instance.logoFile())) {
+            return scaleIcon(new ImageIcon(instance.logoFile().toString()), size, size);
+        }
         String image = instance.image();
         if (image != null && !image.isBlank()) {
             try {
                 Path path = Path.of(image);
                 if (Files.isRegularFile(path)) {
                     return scaleIcon(new ImageIcon(path.toString()), size, size);
+                }
+                Path instanceImage = instance.instanceDirectory().resolve(path);
+                if (Files.isRegularFile(instanceImage)) {
+                    return scaleIcon(new ImageIcon(instanceImage.toString()), size, size);
                 }
             } catch (RuntimeException ignored) {
                 logger.error("Invalid image path for instance " + instance.name());
@@ -242,7 +252,25 @@ public final class PlayPage {
         }
         loaderVersionField.setToolTipText("Choose the mod-loader version, or Latest.");
         loaderVersionField.setEnabled(!"Vanilla".equalsIgnoreCase(comboText(loaderField, "Vanilla")));
-        JTextField imageField = new JTextField(existing == null ? "logo/Sebby64.png" : existing.image(), 20);
+        Path[] selectedImage = {null};
+        JLabel imageSelection = new JLabel(existing == null ? "Default launcher icon"
+                : existing.image() == null || existing.image().isBlank()
+                        ? "Default launcher icon" : "Using the saved instance image");
+        JButton chooseImage = new JButton("Choose image…");
+        chooseImage.addActionListener(_ -> {
+            JFileChooser chooser = new JFileChooser();
+            chooser.setDialogTitle("Choose an instance image");
+            chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                    "Image files (PNG, JPEG, GIF, BMP)", "png", "jpg", "jpeg", "gif", "bmp"));
+            chooser.setAcceptAllFileFilterUsed(false);
+            if (chooser.showOpenDialog(dialog) == JFileChooser.APPROVE_OPTION) {
+                selectedImage[0] = chooser.getSelectedFile().toPath();
+                imageSelection.setText(selectedImage[0].getFileName().toString());
+            }
+        });
+        JPanel imageControls = new JPanel(new BorderLayout(8, 0));
+        imageControls.add(chooseImage, BorderLayout.WEST);
+        imageControls.add(imageSelection, BorderLayout.CENTER);
         JTextField memoryField = new JTextField(existing == null ? "2048" : String.valueOf(existing.memoryMb()), 10);
         JTextField jvmArgsField = new JTextField(
                 existing == null || existing.jvmArgs() == null ? "" : String.join(" ", existing.jvmArgs()), 30);
@@ -329,7 +357,7 @@ public final class PlayPage {
         addInstanceField(dialog, constraints, "Version", versionField, 1);
         addInstanceField(dialog, constraints, "Loader", loaderField, 2);
         addInstanceField(dialog, constraints, "Loader version", loaderVersionField, 3);
-        addInstanceField(dialog, constraints, "Image", imageField, 4);
+        addInstanceField(dialog, constraints, "Image", imageControls, 4);
         addInstanceField(dialog, constraints, "Memory (MB)", memoryField, 5);
         addInstanceField(dialog, constraints, "JVM args", jvmArgsField, 6);
         addInstanceField(dialog, constraints, "Game folder", gameFolderField, 7);
@@ -344,8 +372,8 @@ public final class PlayPage {
                 if ("Vanilla".equalsIgnoreCase(loader) || "Latest".equalsIgnoreCase(loaderVersion)) {
                     loaderVersion = null;
                 }
-                String image = imageField.getText() == null || imageField.getText().isBlank() ? "logo/Sebby64.png"
-                        : imageField.getText().trim();
+                String image = existing == null || existing.image() == null || existing.image().isBlank()
+                        ? "logo/Sebby64.png" : existing.image();
                 String memoryText = memoryField.getText() == null ? "2048" : memoryField.getText().trim();
                 int memoryMb = parseMemory(memoryText);
                 String jvmArgs = jvmArgsField.getText() == null ? "" : jvmArgsField.getText().trim();
@@ -357,12 +385,19 @@ public final class PlayPage {
 
                 Instance instance = new Instance(
                         name, version, loader, image, memoryMb, jvmTokens, gameFolder, loaderVersion);
+                if (selectedImage[0] != null) {
+                    FileUtils.copyImageAsPng(selectedImage[0], instance.logoFile());
+                    instance = new Instance(
+                            name, version, loader, "logo.png", memoryMb, jvmTokens, gameFolder, loaderVersion);
+                }
                 instance.save();
                 refreshInstanceSelector();
                 instanceSelector.setSelectedItem(instance);
                 dialog.dispose();
             } catch (Exception ex) {
                 logger.error("Failed to save instance: " + ex.getMessage());
+                JOptionPane.showMessageDialog(dialog, ex.getMessage(), "Instance could not be saved",
+                        JOptionPane.ERROR_MESSAGE);
             }
         });
 

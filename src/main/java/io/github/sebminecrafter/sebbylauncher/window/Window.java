@@ -16,7 +16,6 @@ import java.net.http.HttpClient;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.github.sebminecrafter.sebbylauncher.GuiHelpers.*;
 
@@ -35,7 +34,6 @@ public class Window {
     static final DefaultListModel<Login.Account> accountListModel = new DefaultListModel<>();
     static final JList<Login.Account> accountList = new JList<>(accountListModel);
     static final Map<String, ImageIcon> accountHeads = new ConcurrentHashMap<>();
-    static final AtomicInteger newsRequest = new AtomicInteger();
     static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     static final HttpClient HTTP = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NORMAL)
@@ -45,7 +43,6 @@ public class Window {
     static final ImageIcon logoSourceIcon = new ImageIcon(Main.getImageAsset("logo/Sebby64.png"));
     static JLabel sidebarLogo;
     static LauncherPreferences preferences = LauncherPreferences.defaults();
-    static JEditorPane newsPane;
     static JLabel newsStatus;
     static String currentNewsUrl = "https://www.minecraft.net/article";
     static JLabel accountNameLabel;

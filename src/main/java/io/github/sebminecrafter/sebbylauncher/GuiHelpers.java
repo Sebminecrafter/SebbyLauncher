@@ -4,6 +4,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static io.github.sebminecrafter.sebbylauncher.Main.logger;
 
@@ -17,6 +19,20 @@ public class GuiHelpers {
             }
         } else {
             logger.error("Desktop not supported.", "SebbyLauncher/GuiHelpers");
+        }
+    }
+
+    public static void openFolder(Path folder, Component parent) {
+        try {
+            Files.createDirectories(folder);
+            if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+                throw new IOException("Opening folders is not supported on this system.");
+            }
+            Desktop.getDesktop().open(folder.toFile());
+        } catch (IOException | UnsupportedOperationException | SecurityException e) {
+            logger.error("Failed to open folder " + folder + ": " + e.getMessage());
+            JOptionPane.showMessageDialog(parent, e.getMessage(), "Folder could not be opened",
+                    JOptionPane.ERROR_MESSAGE);
         }
     }
 

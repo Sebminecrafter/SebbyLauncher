@@ -1,5 +1,8 @@
 package io.github.sebminecrafter.sebbylauncher;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -22,6 +25,22 @@ public final class FileUtils {
     public static void deleteTree(Path root, Path allowedInstanceDirectory) throws IOException {
         validateDeleteTarget(root, allowedInstanceDirectory);
         deleteTreeContents(root);
+    }
+
+    public static void copyImageAsPng(Path source, Path target) throws IOException {
+        BufferedImage image = ImageIO.read(source.toFile());
+        if (image == null) {
+            throw new IOException("The selected file is not a supported image.");
+        }
+
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        if (!ImageIO.write(image, "png", output)) {
+            throw new IOException("Could not convert the selected image to PNG.");
+        }
+
+        Path parent = target.toAbsolutePath().normalize().getParent();
+        if (parent != null) Files.createDirectories(parent);
+        Files.write(target, output.toByteArray());
     }
 
     public static void validateDeleteTarget(Path target) throws IOException {
