@@ -1,19 +1,20 @@
 package io.github.sebminecrafter.sebbylauncher;
 
+import io.github.sebminecrafter.sebbylogger.Logger;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.util.concurrent.ExecutionException;
 
 import static io.github.sebminecrafter.sebbylauncher.GuiHelpers.*;
-import static io.github.sebminecrafter.sebbylauncher.Main.logger;
 
 public class Window {
     private static final JFrame frame = new JFrame("Sebby Launcher");
     private static final GridBagConstraints c = new GridBagConstraints();
-    private static final String source = "SebbyLauncher/Window";
     private static final int minWidth = 480;
     private static final int minHeight = 360;
+    private static final Logger logger = new Logger("SebbyLauncher/Window");
 
     // TODO: Improve layout, separate into two panes (small left top to bottom, big right selection screen(s), like official mc launcher)
     // TODO: Add version, mod loader selectors
@@ -60,36 +61,40 @@ public class Window {
     }
 
     public void start() {
-        logger.debug("Showing window", source);
+        logger.debug("Showing window");
         gui(true);
     }
 
     private void onLaunch(ActionEvent e) {
-        logger.debug("Play button pressed", source);
+        logger.debug("Play button pressed");
         JButton button = (JButton) e.getSource();
         button.setEnabled(false);
 
-        new SwingWorker<Boolean, Void>() {
+        new SwingWorker<Void, Void>() {
             @Override
-            protected Boolean doInBackground() {
-                return Login.attemptLogin();
+            protected Void doInBackground() {
+                if (!Login.attemptLogin()) {
+                    logger.error("Login failed.");
+                    return null;
+                }
+                logger.info("Login verified.");
+                if (new Launcher().launchGame()) {
+                    logger.info("Game started!");
+                } else {
+                    logger.error("Failed to launch game!");
+                }
+                return null;
             }
 
             @Override
             protected void done() {
                 button.setEnabled(true);
                 try {
-                    if (get()) {
-                        logger.info("Login verified.", source);
-                        Launcher launcher = new Launcher();
-                        launcher.launchGame();
-                    } else {
-                        logger.error("Login failed.", source);
-                    }
+                    get();
                 } catch (InterruptedException ex) {
                     Thread.currentThread().interrupt();
                 } catch (ExecutionException ex) {
-                    logger.error("Login crashed: " + ex.getCause(), source);
+                    logger.error("Launch crashed: " + ex.getCause());
                 }
             }
         }.execute();

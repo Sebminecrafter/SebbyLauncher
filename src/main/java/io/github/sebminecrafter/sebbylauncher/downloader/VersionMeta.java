@@ -1,7 +1,10 @@
 package io.github.sebminecrafter.sebbylauncher.downloader;
 
+import com.google.gson.JsonElement;
+
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * The parts of Mojang's version JSON needed to download and launch a version.
@@ -13,6 +16,8 @@ public record VersionMeta(
         String mainClass,
         String assets,
         AssetIndexRef assetIndex,
+        JavaVersion javaVersion,
+        Arguments arguments,
         Map<String, DownloadInfo> downloads,
         List<Library> libraries
 ) {
@@ -24,31 +29,50 @@ public record VersionMeta(
 
     public record LibDownloads(Artifact artifact) {}
 
-    public record OsRule(String name, String arch) {}
+    public record JavaVersion(String component, int majorVersion) {}
 
-    public record Rule(String action, OsRule os) {
-        /**
-         * Whether this rule applies to the current OS and architecture.
-         */
-        boolean matches() {
-            if (os == null) return true;
-            if (os.name() != null && !os.name().equals(Platform.os())) return false;
-            return os.arch() == null || os.arch().equals(Platform.arch());
-        }
-    }
+    /**
+     * Launch arguments (1.13 and newer). Each entry is either a plain string
+     * or an object with {@code rules} and a {@code value} (string or array).
+     */
+    public record Arguments(List<JsonElement> game, List<JsonElement> jvm) {}
 
-    public record Library(String name, LibDownloads downloads, List<Rule> rules) {
+    public record OsRule(String name, String arch, String version) {}
+
+    public record Rule(String action, OsRule os, Map<String, Boolean> features) {
         /**
-         * Whether this library is needed on the current platform.
+         * Whether a list of rules allows something on the current platform.
          * No rules means always; otherwise the last matching rule wins.
          */
-        public boolean appliesHere() {
+        public static boolean allowed(List<Rule> rules) {
             if (rules == null || rules.isEmpty()) return true;
             boolean allowed = false;
             for (Rule r : rules) {
                 if (r.matches()) allowed = r.action().equals("allow");
             }
             return allowed;
+        }
+
+        /**
+         * Whether this rule applies to the current OS, architecture and OS version.
+         * The launcher has no optional features enabled, so rules requiring one never match.
+         */
+        boolean matches() {
+            if (features != null && features.containsValue(true)) return false;
+            if (os == null) return true;
+            if (os.name() != null && !os.name().equals(Platform.os())) return false;
+            if (os.arch() != null && !os.arch().equals(Platform.arch())) return false;
+            return os.version() == null
+                    || Pattern.compile(os.version()).matcher(System.getProperty("os.version")).find();
+        }
+    }
+
+    public record Library(String name, LibDownloads downloads, List<Rule> rules) {
+        /**
+         * Whether this library is needed on the current platform.
+         */
+        public boolean appliesHere() {
+            return Rule.allowed(rules);
         }
     }
 

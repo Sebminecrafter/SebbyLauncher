@@ -65,21 +65,31 @@ public class Downloader {
             VersionMeta meta = getVersionMeta(version);
             if (meta == null) return false;
 
-            VersionMeta.DownloadInfo client = meta.downloads().get("client");
-            Path outputJar = LauncherDirs.VERSIONS.resolve(version).resolve(version + ".jar");
-            logger.info("Downloading " + version + " client.jar");
-
-            downloadVerified(client.url(), outputJar, client.sha1());
+            Path clientJar = downloadClient(meta);
             downloadLibraries(meta);
             downloadAssets(meta);
 
-            logger.info("Download complete: " + outputJar.toAbsolutePath());
+            logger.info("Download complete: " + clientJar.toAbsolutePath());
             return true;
 
         } catch (Exception e) {
             logger.error("Download failed: " + e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * Downloads the client JAR for the given version.
+     *
+     * @return path of the client JAR
+     */
+    public Path downloadClient(VersionMeta meta) throws IOException {
+        VersionMeta.DownloadInfo client = meta.downloads().get("client");
+        Path jar = LauncherDirs.VERSIONS.resolve(meta.id()).resolve(meta.id() + ".jar");
+        logger.info("Downloading " + meta.id() + " client.jar");
+
+        downloadVerified(client.url(), jar, client.sha1());
+        return jar;
     }
 
     /**

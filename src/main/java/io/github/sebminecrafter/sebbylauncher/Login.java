@@ -7,6 +7,7 @@ import com.google.gson.JsonParser;
 import net.lenni0451.commons.httpclient.HttpClient;
 import net.raphimc.minecraftauth.MinecraftAuth;
 import net.raphimc.minecraftauth.java.JavaAuthManager;
+import net.raphimc.minecraftauth.java.model.MinecraftProfile;
 import net.raphimc.minecraftauth.msa.model.MsaDeviceCode;
 import net.raphimc.minecraftauth.msa.service.impl.DeviceCodeMsaAuthService;
 
@@ -40,6 +41,8 @@ public class Login {
     private static final java.net.http.HttpClient HTTP = java.net.http.HttpClient.newHttpClient();
 
     static final File tokenFile = LauncherDirs.TOKENS.resolve("tokens.json").toFile();
+
+    private static JavaAuthManager authManager;
 
     /**
      * Prevent instantiation
@@ -108,6 +111,23 @@ public class Login {
     }
 
     /**
+     * Gets the account details needed to start the game, if there is an existing login
+     * @return a {@link Session}, or {@code null} if there is no login or the profile couldn't be loaded
+     */
+    public static Session getSession() {
+        String token = getMcToken();
+        if (token == null) return null;
+
+        try {
+            MinecraftProfile profile = authManager.getMinecraftProfile().getUpToDate();
+            return new Session(profile.getName(), profile.getId().toString().replace("-", ""), token);
+        } catch (IOException e) {
+            logError("Failed to get Minecraft profile.", e);
+            return null;
+        }
+    }
+
+    /**
      * Check whether a user (token) owns Minecraft
      * @param accessToken a valid access token for a Minecraft account
      * @return a boolean on whether the token owns a Minecraft account
@@ -156,7 +176,7 @@ public class Login {
             logError("Ownership check was interrupted.", e);
         }
         return false;
-    }    private static JavaAuthManager authManager;
+    }
 
     /**
      * Log an error
