@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.lang.reflect.Type;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,12 +25,12 @@ import java.util.stream.Collectors;
 /**
  * Builds the command line that starts a Minecraft version.
  */
+@SuppressWarnings("unused")
 public final class LaunchCommand {
     private static final Logger logger = new Logger("SebbyLauncher/LaunchCommand");
     private static final Gson GSON = new Gson();
     private static final Type RULES_TYPE = new TypeToken<List<VersionMeta.Rule>>() {}.getType();
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([^}]+)}");
-    private static final String MEMORY = "-Xmx2G";
     private static final String LAUNCHER_VERSION = launcherVersion();
 
     /**
@@ -53,6 +54,11 @@ public final class LaunchCommand {
      * @throws UnsupportedOperationException for versions that predate the {@code arguments} format
      */
     public static List<String> build(VersionMeta meta, Session session, Path gameDir, Path nativesDir, List<Path> classpath) {
+        return build(meta, session, gameDir, nativesDir, classpath, 2048, "");
+    }
+
+    public static List<String> build(VersionMeta meta, Session session, Path gameDir, Path nativesDir, List<Path> classpath,
+                                    int memoryMb, String extraJvmArgs) {
         if (meta.arguments() == null) {
             throw new UnsupportedOperationException("Versions before 1.13 are not supported yet: " + meta.id());
         }
@@ -60,7 +66,8 @@ public final class LaunchCommand {
 
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
-        command.add(MEMORY);
+        command.add("-Xmx" + Math.max(memoryMb, 512) + "M");
+        command.addAll(parseJvmArgs(extraJvmArgs));
         command.addAll(resolve(meta.arguments().jvm(), vars));
         command.add(meta.mainClass());
         command.addAll(resolve(meta.arguments().game(), vars));
@@ -134,6 +141,16 @@ public final class LaunchCommand {
             }
             return Matcher.quoteReplacement(value);
         });
+    }
+
+    private static List<String> parseJvmArgs(String extraJvmArgs) {
+        if (extraJvmArgs == null || extraJvmArgs.isBlank()) {
+            return List.of();
+        }
+
+        return Arrays.stream(extraJvmArgs.trim().split("\\s+"))
+                .filter(arg -> !arg.isBlank())
+                .toList();
     }
 
     /**
