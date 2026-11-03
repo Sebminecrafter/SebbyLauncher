@@ -9,6 +9,7 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -18,6 +19,8 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -32,7 +35,12 @@ public class Downloader {
     private static final String JAVA_RUNTIME_MANIFEST_URL = "https://piston-meta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json";
     private static final Logger logger = new Logger("SebbyLauncher/Downloader");
     private static final String RESOURCES_URL = "https://resources.download.minecraft.net/";
+    private static final String QUILT_LOADER_METADATA_URL =
+            "https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-loader/maven-metadata.xml";
+    private static final Pattern QUILT_LATEST_VERSION_PATTERN =
+            Pattern.compile("<latest>\\s*([^<]+?)\\s*</latest>");
     private static final int ASSET_THREADS = 16;
+    private static final String JAVA_25_ASM_VERSION = "9.11.1";
     private static final Gson GSON = new Gson();
 
     private JsonObject manifestCache;
@@ -124,12 +132,55 @@ public class Downloader {
     }
 
     public VersionMeta getVersionMeta(String version, String loader) throws IOException {
+        return getVersionMeta(version, loader, null);
+    }
+
+    public VersionMeta getVersionMeta(String version, String loader, String loaderVersion) throws IOException {
         VersionMeta base = getVersionMeta(version);
         if (base == null || loader == null || loader.isBlank()) return base;
         String normalized = normalizeLoader(loader);
-        if (normalized.equals("vanilla")) return base;
-        if (normalized.equals("fabric")) return applyFabricLoader(base);
-        return base;
+        return switch (normalized) {
+            case "fabric" -> applyFabricLoader(base, loaderVersion);
+            case "quilt" -> applyQuiltLoader(base, loaderVersion);
+            default -> base;
+        };
+    }
+
+    public List<String> listLoaderVersions(String gameVersion, String loader) throws IOException {
+        String normalized = normalizeLoader(loader);
+        if (normalized.equals("vanilla")) return List.of();
+        if (gameVersion == null || gameVersion.isBlank() || gameVersion.equalsIgnoreCase("latest")) {
+            gameVersion = getLatestVersion(false);
+            if (gameVersion == null) {
+                throw new IOException("Could not resolve the latest Minecraft release.");
+            }
+        }
+
+        String metadataUrl = switch (normalized) {
+            case "fabric" -> "https://meta.fabricmc.net/v2";
+            case "quilt" -> "https://meta.quiltmc.org/v3";
+            default -> throw new IOException("Unsupported mod loader: " + loader);
+        };
+        JsonArray versions = readJsonArrayFromUrl(
+                metadataUrl + "/versions/loader/" + gameVersion);
+        if (versions == null) {
+            throw new IOException("Could not retrieve " + loader + " loader versions for " + gameVersion);
+        }
+
+        List<String> result = new ArrayList<>();
+        for (JsonElement element : versions) {
+            if (!element.isJsonObject()) continue;
+            JsonObject info = element.getAsJsonObject().getAsJsonObject("loader");
+            if (info != null && info.has("version") && !info.get("version").isJsonNull()) {
+                result.add(info.get("version").getAsString());
+            }
+        }
+        if (normalized.equals("quilt")) {
+            String latestVersion = getLatestQuiltLoaderVersion();
+            result.remove(latestVersion);
+            result.addFirst(latestVersion);
+        }
+        return result;
     }
 
     public Path downloadJavaRuntime(VersionMeta.JavaVersion javaVersion) throws IOException {
@@ -219,46 +270,81 @@ public class Downloader {
         String normalized = loader.trim();
         if (normalized.equalsIgnoreCase("vanilla") || normalized.equalsIgnoreCase("default")) return "vanilla";
         if (normalized.equalsIgnoreCase("fabric") || normalized.equalsIgnoreCase("fabric-loader")) return "fabric";
+        if (normalized.equalsIgnoreCase("quilt") || normalized.equalsIgnoreCase("quilt-loader")) return "quilt";
         return normalized.toLowerCase(Locale.ROOT);
     }
 
-    private VersionMeta applyFabricLoader(VersionMeta base) throws IOException {
+    private VersionMeta applyFabricLoader(VersionMeta base, String loaderVersion) throws IOException {
+        return applyLoaderProfile(base, "Fabric", "https://meta.fabricmc.net/v2", loaderVersion);
+    }
+
+    private VersionMeta applyQuiltLoader(VersionMeta base, String loaderVersion) throws IOException {
+        return applyLoaderProfile(base, "Quilt", "https://meta.quiltmc.org/v3", loaderVersion);
+    }
+
+    private VersionMeta applyLoaderProfile(
+            VersionMeta base, String loaderName, String metadataUrl, String requestedLoaderVersion)
+            throws IOException {
         String version = base.id();
-        JsonArray versions = readJsonArrayFromUrl("https://meta.fabricmc.net/v2/versions/loader/" + version);
-        if (versions == null || versions.isEmpty()) {
-            logger.error("No Fabric loader is available for version " + version);
-            return base;
-        }
+        boolean useLatest = requestedLoaderVersion == null || requestedLoaderVersion.isBlank()
+                || "latest".equalsIgnoreCase(requestedLoaderVersion.trim());
+        String loaderVersion;
+        if (loaderName.equals("Quilt")) {
+            loaderVersion = useLatest ? getLatestQuiltLoaderVersion() : requestedLoaderVersion.trim();
+        } else {
+            JsonArray versions = readJsonArrayFromUrl(metadataUrl + "/versions/loader/" + version);
+            if (versions == null || versions.isEmpty()) {
+                if (!useLatest) {
+                    throw new IOException("No " + loaderName + " loader is available for version " + version);
+                }
+                logger.error("No " + loaderName + " loader is available for version " + version);
+                return base;
+            }
 
-        JsonObject selected = versions.get(0).getAsJsonObject();
-        JsonObject loaderInfo = selected.has("loader") ? selected.getAsJsonObject("loader") : null;
-        if (loaderInfo == null || loaderInfo.get("version") == null) {
-            logger.error("Fabric loader metadata is incomplete for version " + version);
-            return base;
-        }
-
-        String loaderVersion = loaderInfo.get("version").getAsString();
-        JsonObject profile = readJsonObjectFromUrl("https://meta.fabricmc.net/v2/versions/loader/" + version + "/" + loaderVersion + "/profile/json");
-        if (profile == null) {
-            logger.error("Could not fetch Fabric profile for " + version + " loader " + loaderVersion);
-            return base;
-        }
-
-        List<VersionMeta.Library> mergedLibraries = new ArrayList<>(base.libraries() == null ? List.of() : base.libraries());
-        JsonArray fabricLibraries = profile.has("libraries") ? profile.getAsJsonArray("libraries") : new JsonArray();
-        if (fabricLibraries != null && !fabricLibraries.isEmpty()) {
-            for (JsonElement element : fabricLibraries) {
-                if (element == null || element.isJsonNull() || !element.isJsonObject()) continue;
-                VersionMeta.Library lib = parseFabricLibrary(element.getAsJsonObject());
-                if (lib == null || lib.name() == null) continue;
-                boolean duplicate = false;
-                for (VersionMeta.Library existing : mergedLibraries) {
-                    if (existing != null && lib.name().equals(existing.name())) {
-                        duplicate = true;
+            JsonObject selected = null;
+            if (!useLatest) {
+                for (JsonElement element : versions) {
+                    if (!element.isJsonObject()) continue;
+                    JsonObject loader = element.getAsJsonObject().getAsJsonObject("loader");
+                    if (loader != null && loader.has("version")
+                            && requestedLoaderVersion.equals(loader.get("version").getAsString())) {
+                        selected = element.getAsJsonObject();
                         break;
                     }
                 }
-                if (!duplicate) mergedLibraries.add(lib);
+                if (selected == null) {
+                    throw new IOException(loaderName + " loader " + requestedLoaderVersion
+                            + " is unavailable for Minecraft " + version);
+                }
+            } else {
+                selected = versions.get(0).getAsJsonObject();
+            }
+            JsonObject loaderInfo = selected.has("loader") ? selected.getAsJsonObject("loader") : null;
+            if (loaderInfo == null || loaderInfo.get("version") == null) {
+                logger.error(loaderName + " loader metadata is incomplete for version " + version);
+                return base;
+            }
+            loaderVersion = loaderInfo.get("version").getAsString();
+        }
+
+        JsonObject profile = readJsonObjectFromUrl(
+                metadataUrl + "/versions/loader/" + version + "/" + loaderVersion + "/profile/json");
+        if (profile == null) {
+            logger.error("Could not fetch " + loaderName + " profile for " + version + " loader " + loaderVersion);
+            return base;
+        }
+
+        int requiredJava = base.javaVersion() == null ? 0 : base.javaVersion().majorVersion();
+        boolean quiltNeedsNewerAsm = loaderName.equals("Quilt") && requiredJava >= 25;
+        List<VersionMeta.Library> mergedLibraries = new ArrayList<>(base.libraries() == null ? List.of() : base.libraries());
+        JsonArray loaderLibraries = profile.has("libraries") ? profile.getAsJsonArray("libraries") : new JsonArray();
+        if (loaderLibraries != null && !loaderLibraries.isEmpty()) {
+            for (JsonElement element : loaderLibraries) {
+                if (element == null || element.isJsonNull() || !element.isJsonObject()) continue;
+                VersionMeta.Library lib = parseLoaderLibrary(element.getAsJsonObject());
+                if (lib == null || lib.name() == null) continue;
+                if (quiltNeedsNewerAsm) lib = upgradeAsmForJavaVersion(lib, requiredJava);
+                mergeLoaderLibrary(mergedLibraries, lib, quiltNeedsNewerAsm);
             }
         }
 
@@ -277,6 +363,18 @@ public class Downloader {
                 arguments, base.minecraftArguments(), base.downloads(), mergedLibraries);
     }
 
+    private String getLatestQuiltLoaderVersion() throws IOException {
+        return parseLatestQuiltLoaderVersion(readTextFromUrl(QUILT_LOADER_METADATA_URL));
+    }
+
+    static String parseLatestQuiltLoaderVersion(String metadata) throws IOException {
+        Matcher latest = QUILT_LATEST_VERSION_PATTERN.matcher(metadata);
+        if (!latest.find() || latest.group(1).isBlank()) {
+            throw new IOException("Could not find the latest Quilt loader version in Maven metadata.");
+        }
+        return latest.group(1).trim();
+    }
+
     private static VersionMeta.Arguments mergeArguments(VersionMeta.Arguments base, VersionMeta.Arguments loader) {
         List<JsonElement> game = new ArrayList<>();
         List<JsonElement> jvm = new ArrayList<>();
@@ -291,7 +389,7 @@ public class Downloader {
         return new VersionMeta.Arguments(game, jvm);
     }
 
-    private VersionMeta.Library parseFabricLibrary(JsonObject obj) {
+    private VersionMeta.Library parseLoaderLibrary(JsonObject obj) {
         JsonElement nameElement = obj.get("name");
         if (nameElement == null || nameElement.isJsonNull()) return null;
         String name = nameElement.getAsString();
@@ -321,6 +419,62 @@ public class Downloader {
         return new VersionMeta.Library(name, new VersionMeta.LibDownloads(artifact, Map.of()), natives, extract, rules);
     }
 
+    static VersionMeta.Library upgradeAsmForJavaVersion(VersionMeta.Library library, int javaMajor) {
+        if (javaMajor < 25 || !isAsmLibrary(library.name()) || supportsJava25Asm(library.name())) return library;
+
+        String[] coordinates = library.name().split(":");
+        String upgradedName = coordinates[0] + ":" + coordinates[1] + ":" + JAVA_25_ASM_VERSION;
+        VersionMeta.Artifact artifact = new VersionMeta.Artifact(
+                relativeArtifactPath(upgradedName), null, 0, mavenLibraryUrl(upgradedName));
+        VersionMeta.LibDownloads downloads = new VersionMeta.LibDownloads(
+                artifact, library.downloads() == null ? Map.of() : library.downloads().classifiers());
+        return new VersionMeta.Library(
+                upgradedName, downloads, library.natives(), library.extract(), library.rules());
+    }
+
+    static void mergeLoaderLibrary(
+            List<VersionMeta.Library> libraries, VersionMeta.Library candidate, boolean replaceOldAsm) {
+        for (int i = 0; i < libraries.size(); i++) {
+            VersionMeta.Library existing = libraries.get(i);
+            if (existing == null) continue;
+            if (candidate.name().equals(existing.name())) return;
+            if (replaceOldAsm && isAsmLibrary(candidate.name())
+                    && sameMavenModule(existing.name(), candidate.name())) {
+                if (!supportsJava25Asm(existing.name())) libraries.set(i, candidate);
+                return;
+            }
+        }
+        libraries.add(candidate);
+    }
+
+    private static boolean isAsmLibrary(String name) {
+        return name != null && name.startsWith("org.ow2.asm:");
+    }
+
+    private static boolean supportsJava25Asm(String name) {
+        if (!isAsmLibrary(name)) return false;
+        String[] coordinates = name.split(":");
+        if (coordinates.length < 3) return false;
+        String[] version = coordinates[2].split("\\.");
+        if (version.length < 2) return false;
+        try {
+            int major = Integer.parseInt(version[0]);
+            int minor = Integer.parseInt(version[1]);
+            return major > 9 || (major == 9 && minor >= 8);
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private static boolean sameMavenModule(String first, String second) {
+        if (first == null || second == null) return false;
+        String[] firstCoordinates = first.split(":");
+        String[] secondCoordinates = second.split(":");
+        return firstCoordinates.length >= 3 && secondCoordinates.length >= 3
+                && firstCoordinates[0].equals(secondCoordinates[0])
+                && firstCoordinates[1].equals(secondCoordinates[1]);
+    }
+
     private List<JsonElement> parseArgumentList(JsonElement element) {
         if (element == null || element.isJsonNull()) return List.of();
         if (element.isJsonArray()) {
@@ -337,6 +491,14 @@ public class Downloader {
     private JsonObject readJsonObjectFromUrl(String urlStr) throws IOException {
         JsonElement element = readJsonElementFromUrl(urlStr);
         return element == null || element.isJsonNull() ? null : element.getAsJsonObject();
+    }
+
+    private String readTextFromUrl(String urlStr) throws IOException {
+        HttpURLConnection conn = open(urlStr);
+        conn.setRequestProperty("User-Agent", "SebbyLauncher");
+        try (InputStream in = conn.getInputStream()) {
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     private JsonElement readJsonElementFromUrl(String urlStr) throws IOException {

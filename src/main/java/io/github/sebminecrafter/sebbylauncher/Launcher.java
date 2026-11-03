@@ -74,7 +74,8 @@ public class Launcher {
         logger.info("Starting game " + version + "...");
         try {
             String loader = instance == null ? "Vanilla" : instance.loader();
-            VersionMeta meta = downloader.getVersionMeta(version, loader);
+            VersionMeta meta = downloader.getVersionMeta(
+                    version, loader, instance == null ? null : instance.loaderVersion());
             if (meta == null)
                 return false;
 

@@ -2,13 +2,16 @@ package io.github.sebminecrafter.sebbylauncher.window;
 
 import io.github.sebminecrafter.sebbylauncher.Instance;
 import io.github.sebminecrafter.sebbylauncher.Login;
+import io.github.sebminecrafter.sebbylauncher.FileUtils;
 import io.github.sebminecrafter.sebbylauncher.Main;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -68,7 +71,8 @@ public final class PlayPage {
         for (int i = 0; i < instanceSelector.getItemCount(); i++) {
             Instance instance = instanceSelector.getItemAt(i);
             JButton tile = new JButton("<html><center>" + escapeHtml(instance.name()) + "<br>"
-                    + escapeHtml(instance.version()) + " · " + escapeHtml(instance.loader()) + "</center></html>",
+                    + escapeHtml(instance.version()) + " · " + escapeHtml(loaderDescription(instance))
+                    + "</center></html>",
                     instanceIcon(instance, 72));
             tile.setHorizontalTextPosition(SwingConstants.CENTER);
             tile.setVerticalTextPosition(SwingConstants.BOTTOM);
@@ -103,6 +107,7 @@ public final class PlayPage {
         instanceOptions.removeAll();
         Instance instance = (Instance) instanceSelector.getSelectedItem();
         if (instance == null) {
+            launchButton = null;
             instanceOptions.add(new JLabel("Create an instance to get started."), BorderLayout.CENTER);
             instanceOptions.revalidate();
             instanceOptions.repaint();
@@ -116,7 +121,7 @@ public final class PlayPage {
         JLabel name = new JLabel(instance.name());
         name.setFont(name.getFont().deriveFont(Font.BOLD, 20f));
         name.setAlignmentX(Component.CENTER_ALIGNMENT);
-        JLabel version = new JLabel(instance.version() + " · " + instance.loader());
+        JLabel version = new JLabel(instance.version() + " · " + loaderDescription(instance));
         version.setAlignmentX(Component.CENTER_ALIGNMENT);
         JLabel memory = new JLabel(instance.memoryMb() + " MB memory");
         memory.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -131,6 +136,12 @@ public final class PlayPage {
         JButton edit = new JButton("Instance settings");
         edit.addActionListener(_ -> openInstanceDialog(instance));
         actions.add(edit);
+        JButton manageMods = new JButton("Manage mods");
+        manageMods.addActionListener(_ -> ModsDialog.open(instance));
+        actions.add(manageMods);
+        JButton delete = new JButton("Delete instance");
+        delete.addActionListener(_ -> deleteInstance(instance));
+        actions.add(delete);
         launchButton = new JButton("Play", new ImageIcon(Main.getImageAsset("play1.png")));
         launchButton.setPressedIcon(new ImageIcon(Main.getImageAsset("play2.png")));
         launchButton.addActionListener(Window::onLaunch);
@@ -160,6 +171,12 @@ public final class PlayPage {
     static String escapeHtml(String value) {
         if (value == null) return "";
         return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    private static String loaderDescription(Instance instance) {
+        return instance.loaderVersion() == null || instance.loaderVersion().isBlank()
+                ? instance.loader()
+                : instance.loader() + " " + instance.loaderVersion();
     }
 
     static void refreshInstanceSelector() {
@@ -214,10 +231,17 @@ public final class PlayPage {
         versionField.setEditable(true);
         versionField.setSelectedItem(existing == null ? "latest" : existing.version());
         versionField.setToolTipText("Choose a version or type a custom version ID.");
-        JComboBox<String> loaderField = new JComboBox<>(new String[] {"Vanilla", "Fabric"});
-        loaderField.setEditable(true);
+        JComboBox<String> loaderField = new JComboBox<>(new String[] {"Vanilla", "Fabric", "Quilt"});
         loaderField.setSelectedItem(existing == null ? "Vanilla" : existing.loader());
-        loaderField.setToolTipText("Choose Vanilla or Fabric, or type another loader name.");
+        loaderField.setToolTipText("Choose Vanilla, Fabric, or Quilt.");
+        JComboBox<String> loaderVersionField = new JComboBox<>(new String[] {"Latest"});
+        String existingLoaderVersion = existing == null ? null : existing.loaderVersion();
+        if (existingLoaderVersion != null && !existingLoaderVersion.isBlank()) {
+            loaderVersionField.addItem(existingLoaderVersion);
+            loaderVersionField.setSelectedItem(existingLoaderVersion);
+        }
+        loaderVersionField.setToolTipText("Choose the mod-loader version, or Latest.");
+        loaderVersionField.setEnabled(!"Vanilla".equalsIgnoreCase(comboText(loaderField, "Vanilla")));
         JTextField imageField = new JTextField(existing == null ? "logo/Sebby64.png" : existing.image(), 20);
         JTextField memoryField = new JTextField(existing == null ? "2048" : String.valueOf(existing.memoryMb()), 10);
         JTextField jvmArgsField = new JTextField(
@@ -247,13 +271,68 @@ public final class PlayPage {
             }
         }.execute();
 
+        Runnable refreshLoaderVersions = () -> {
+            String selectedLoader = comboText(loaderField, "Vanilla");
+            String selectedGameVersion = comboText(versionField, "latest");
+            loaderVersionField.setEnabled(!"Vanilla".equalsIgnoreCase(selectedLoader));
+            if ("Vanilla".equalsIgnoreCase(selectedLoader)) {
+                loaderVersionField.removeAllItems();
+                loaderVersionField.addItem("Latest");
+                return;
+            }
+
+            Object selectedItem = loaderVersionField.getSelectedItem();
+            String previousSelection = selectedItem == null ? "Latest" : selectedItem.toString();
+            loaderVersionField.removeAllItems();
+            loaderVersionField.addItem("Latest");
+            new SwingWorker<List<String>, Void>() {
+                @Override
+                protected List<String> doInBackground() throws Exception {
+                    return new io.github.sebminecrafter.sebbylauncher.downloader.Downloader()
+                            .listLoaderVersions(selectedGameVersion, selectedLoader);
+                }
+
+                @Override
+                protected void done() {
+                    if (!selectedLoader.equals(comboText(loaderField, "Vanilla"))
+                            || !selectedGameVersion.equals(comboText(versionField, "latest"))) return;
+                    try {
+                        List<String> versions = get();
+                        loaderVersionField.removeAllItems();
+                        loaderVersionField.addItem("Latest");
+                        for (String loaderVersion : versions) {
+                            loaderVersionField.addItem(loaderVersion);
+                        }
+                        if (((DefaultComboBoxModel<String>) loaderVersionField.getModel())
+                                .getIndexOf(previousSelection) >= 0) {
+                            loaderVersionField.setSelectedItem(previousSelection);
+                        } else {
+                            loaderVersionField.setSelectedItem("Latest");
+                        }
+                    } catch (Exception e) {
+                        logger.error("Failed to load loader versions: " + e.getMessage());
+                        loaderVersionField.setToolTipText(
+                                "Could not load versions. Choose Latest or try again later.");
+                    }
+                }
+            }.execute();
+        };
+        loaderField.addActionListener(_ -> refreshLoaderVersions.run());
+        Timer versionRefreshDebounce = new Timer(350, _ -> refreshLoaderVersions.run());
+        versionRefreshDebounce.setRepeats(false);
+        versionField.addActionListener(_ -> versionRefreshDebounce.restart());
+        if (!"Vanilla".equalsIgnoreCase(comboText(loaderField, "Vanilla"))) {
+            refreshLoaderVersions.run();
+        }
+
         addInstanceField(dialog, constraints, "Name", nameField, 0);
         addInstanceField(dialog, constraints, "Version", versionField, 1);
         addInstanceField(dialog, constraints, "Loader", loaderField, 2);
-        addInstanceField(dialog, constraints, "Image", imageField, 3);
-        addInstanceField(dialog, constraints, "Memory (MB)", memoryField, 4);
-        addInstanceField(dialog, constraints, "JVM args", jvmArgsField, 5);
-        addInstanceField(dialog, constraints, "Game folder", gameFolderField, 6);
+        addInstanceField(dialog, constraints, "Loader version", loaderVersionField, 3);
+        addInstanceField(dialog, constraints, "Image", imageField, 4);
+        addInstanceField(dialog, constraints, "Memory (MB)", memoryField, 5);
+        addInstanceField(dialog, constraints, "JVM args", jvmArgsField, 6);
+        addInstanceField(dialog, constraints, "Game folder", gameFolderField, 7);
 
         JButton saveButton = new JButton("Save");
         saveButton.addActionListener(_ -> {
@@ -261,6 +340,10 @@ public final class PlayPage {
                 String name = Instance.sanitizeName(nameField.getText());
                 String version = comboText(versionField, "latest");
                 String loader = comboText(loaderField, "Vanilla");
+                String loaderVersion = comboText(loaderVersionField, "Latest");
+                if ("Vanilla".equalsIgnoreCase(loader) || "Latest".equalsIgnoreCase(loaderVersion)) {
+                    loaderVersion = null;
+                }
                 String image = imageField.getText() == null || imageField.getText().isBlank() ? "logo/Sebby64.png"
                         : imageField.getText().trim();
                 String memoryText = memoryField.getText() == null ? "2048" : memoryField.getText().trim();
@@ -272,7 +355,8 @@ public final class PlayPage {
                                 .toList();
                 String gameFolder = gameFolderField.getText() == null ? "" : gameFolderField.getText().trim();
 
-                Instance instance = new Instance(name, version, loader, image, memoryMb, jvmTokens, gameFolder);
+                Instance instance = new Instance(
+                        name, version, loader, image, memoryMb, jvmTokens, gameFolder, loaderVersion);
                 instance.save();
                 refreshInstanceSelector();
                 instanceSelector.setSelectedItem(instance);
@@ -283,7 +367,7 @@ public final class PlayPage {
         });
 
         constraints.gridx = 0;
-        constraints.gridy = 7;
+        constraints.gridy = 8;
         constraints.gridwidth = 2;
         constraints.fill = GridBagConstraints.NONE;
         constraints.anchor = GridBagConstraints.EAST;
@@ -314,6 +398,53 @@ public final class PlayPage {
     private static String comboText(JComboBox<String> combo, String fallback) {
         Object value = combo.isEditable() ? combo.getEditor().getItem() : combo.getSelectedItem();
         return value == null || value.toString().isBlank() ? fallback : value.toString().trim();
+    }
+
+    private static void deleteInstance(Instance instance) {
+        Path instanceDirectory;
+        Path gameDirectory;
+        try {
+            instanceDirectory = instance.instanceDirectory().toAbsolutePath().normalize();
+            gameDirectory = instance.gameDirectory().toAbsolutePath().normalize();
+            FileUtils.validateDeleteTarget(instanceDirectory, instanceDirectory);
+            FileUtils.validateDeleteTarget(gameDirectory, instanceDirectory);
+        } catch (IOException | InvalidPathException e) {
+            logger.error("Refusing to delete instance: " + e.getMessage());
+            JOptionPane.showMessageDialog(frame, e.getMessage(), "Instance could not be deleted",
+                    JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        String confirmation = "Delete instance \"" + instance.name() + "\" and its files?\n\n"
+                + "Instance folder: " + instanceDirectory + "\n"
+                + "Game folder: " + gameDirectory;
+        if (JOptionPane.showConfirmDialog(frame, confirmation, "Confirm instance deletion",
+                JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                if (!gameDirectory.equals(instanceDirectory) && !gameDirectory.startsWith(instanceDirectory)) {
+                    FileUtils.deleteTree(gameDirectory, instanceDirectory);
+                }
+                FileUtils.deleteTree(instanceDirectory, instanceDirectory);
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    get();
+                    refreshInstanceSelector();
+                } catch (Exception e) {
+                    logger.error("Failed to delete instance: " + e.getMessage());
+                    JOptionPane.showMessageDialog(frame, e.getMessage(), "Instance could not be deleted",
+                            JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
     }
 
     private static int parseMemory(String memoryText) {

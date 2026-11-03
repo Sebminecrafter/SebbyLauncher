@@ -1,6 +1,7 @@
 package io.github.sebminecrafter.sebbylauncher.window;
 
 import io.github.sebminecrafter.sebbylauncher.Instance;
+import io.github.sebminecrafter.sebbylauncher.FileUtils;
 import io.github.sebminecrafter.sebbylauncher.LauncherDirs;
 import io.github.sebminecrafter.sebbylauncher.LauncherPreferences;
 
@@ -12,11 +13,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Map;
 
@@ -146,7 +144,7 @@ public final class SettingsPage {
             new SwingWorker<Void, Void>() {
                 @Override
                 protected Void doInBackground() throws Exception {
-                    for (Path path : selected) deleteTree(path);
+                    for (Path path : selected) FileUtils.deleteTree(path);
                     return null;
                 }
 
@@ -318,7 +316,7 @@ public final class SettingsPage {
                         result.append(instance.name()).append(": tracks the latest release (").append(latest).append(")\n");
                     } else {
                         try {
-                            if (downloader.getVersionMeta(version, instance.loader()) == null) {
+                            if (downloader.getVersionMeta(version, instance.loader(), instance.loaderVersion()) == null) {
                                 result.append(instance.name()).append(": version ").append(version)
                                         .append(" is unavailable; consider ").append(latest).append("\n");
                             } else {
@@ -349,24 +347,6 @@ public final class SettingsPage {
                 }
             }
         }.execute();
-    }
-
-    private static void deleteTree(Path root) throws IOException {
-        if (!Files.exists(root)) return;
-        Files.walkFileTree(root, new SimpleFileVisitor<>() {
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
-                Files.delete(file);
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult postVisitDirectory(Path directory, IOException error) throws IOException {
-                if (error != null) throw error;
-                Files.delete(directory);
-                return FileVisitResult.CONTINUE;
-            }
-        });
     }
 
     private record SettingsExport(LauncherPreferences preferences, List<Instance> instances) {}

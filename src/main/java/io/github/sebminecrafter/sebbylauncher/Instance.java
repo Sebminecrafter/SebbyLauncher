@@ -12,8 +12,13 @@ import java.util.List;
 import java.util.stream.Stream;
 
 public record Instance(String name, String version, String loader, String image, int memoryMb,
-                      List<String> jvmArgs, String gameFolder) {
+                      List<String> jvmArgs, String gameFolder, String loaderVersion) {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
+    public Instance(String name, String version, String loader, String image, int memoryMb,
+                    List<String> jvmArgs, String gameFolder) {
+        this(name, version, loader, image, memoryMb, jvmArgs, gameFolder, null);
+    }
 
     public static Instance defaultInstance() {
         Instance fallback = new Instance("Default", "latest", "Vanilla", "logo/Sebby64.png", 2048, List.of(), "");
@@ -49,9 +54,6 @@ public record Instance(String name, String version, String loader, String image,
             // The instance directory may not exist yet or may be unreadable.
         }
 
-        if (instances.isEmpty()) {
-            instances.add(defaultInstance());
-        }
         return instances;
     }
 
