@@ -34,10 +34,10 @@
 
 ## 6. Finish the other pages
 
-- [ ] **News:** show Minecraft news if practical; add Home and Copy URL buttons.
-- [ ] **Accounts:** show account heads, skins, and capes; account login options can build on the account store above.
-- [ ] **Settings:** add theme/color options, resource cleanup, custom version JSON loading, instance update checks, and settings import/export.
-- [ ] **Play:** Add sidebar icons and polish the instance grid and its options panel, make sure to change version and mod loader selector to be typing + dropdown combo
+- [X] **News:** show Minecraft news if practical; add Home and Copy URL buttons.
+- [X] **Accounts:** show account heads, skins, and capes; account login options can build on the account store above.
+- [X] **Settings:** add theme/color options, resource cleanup, custom version JSON loading, instance update checks, and settings import/export.
+- [X] **Play:** Add sidebar icons and polish the instance grid and its options panel, make sure to change version and mod loader selector to be typing + dropdown combo
 
 ## 7. Improvements
 

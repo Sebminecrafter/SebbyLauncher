@@ -16,7 +16,7 @@ public record Instance(String name, String version, String loader, String image,
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     public static Instance defaultInstance() {
-        Instance fallback = new Instance("Default", "latest", "Vanilla", "Sebby64.png", 2048, List.of(), "");
+        Instance fallback = new Instance("Default", "latest", "Vanilla", "logo/Sebby64.png", 2048, List.of(), "");
         try {
             fallback.save();
         } catch (IOException ignored) {

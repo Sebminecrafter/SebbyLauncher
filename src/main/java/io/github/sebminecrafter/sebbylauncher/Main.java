@@ -1,5 +1,7 @@
 package io.github.sebminecrafter.sebbylauncher;
 
+import io.github.sebminecrafter.sebbylauncher.window.Window;
+
 import io.github.sebminecrafter.sebbylogger.Logger;
 
 import java.net.URL;

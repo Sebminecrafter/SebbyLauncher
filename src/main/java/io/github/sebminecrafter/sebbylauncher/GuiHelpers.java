@@ -21,13 +21,8 @@ public class GuiHelpers {
     }
 
     public static ImageIcon scaleIcon(ImageIcon oldIcon, int w, int h) {
-        /*
-        Adapted from https://stackoverflow.com/a/18335435
-        Posted by trolologuy
-        Retrieved 2025-11-25, License - CC BY-SA 3.0
-        */
         Image newIcon = oldIcon.getImage();
-        Image newimg = newIcon.getScaledInstance(w, h,  Image.SCALE_SMOOTH); // scale it the smooth way
-        return new ImageIcon(newimg); // transform it back
+        Image newImg = newIcon.getScaledInstance(w, h,  Image.SCALE_SMOOTH); // scale it the smooth way
+        return new ImageIcon(newImg); // transform it back
     }
 }

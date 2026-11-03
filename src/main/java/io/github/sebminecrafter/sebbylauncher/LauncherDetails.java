@@ -36,7 +36,7 @@ public class LauncherDetails {
                 return "dev";
             Properties props = new Properties();
             props.load(in);
-            String version = props.getProperty("build_time", "dev");
+            String version = props.getProperty("built_at", "dev");
             return version.startsWith("${") ? "dev" : version;
         } catch (IOException e) {
             return "dev";

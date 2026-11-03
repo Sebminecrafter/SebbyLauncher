@@ -19,3 +19,7 @@ It features:
  * Separate instance folders (configurable)
  * Mod loaders
  * Mod downloading and updating
+
+### Tests
+
+Run the unit tests with `mvn test`.

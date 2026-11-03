@@ -13,8 +13,6 @@ import net.raphimc.minecraftauth.msa.service.impl.DeviceCodeMsaAuthService;
 
 import javax.swing.JButton;
 import javax.swing.SwingUtilities;
-import java.awt.GridBagConstraints;
-import java.awt.Insets;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
@@ -37,7 +35,7 @@ import java.util.function.Consumer;
 
 import static io.github.sebminecrafter.sebbylauncher.GuiHelpers.open;
 import static io.github.sebminecrafter.sebbylauncher.Main.logger;
-import static io.github.sebminecrafter.sebbylauncher.Window.addItem;
+import static io.github.sebminecrafter.sebbylauncher.window.Window.addItem;
 
 @SuppressWarnings("unused")
 public class Login {
@@ -133,6 +131,36 @@ public class Login {
             store.remove("selectedAccountId");
         } else {
             store.addProperty("selectedAccountId", accountId);
+        }
+        saveAccountStore(store);
+    }
+
+    public static void removeAccount(String accountId) {
+        if (accountId == null || accountId.isBlank()) return;
+        JsonObject store = loadAccountStore();
+        JsonArray accounts = store.has("accounts") && store.get("accounts").isJsonArray()
+                ? store.getAsJsonArray("accounts") : new JsonArray();
+        JsonArray retained = new JsonArray();
+        boolean removed = false;
+        for (JsonElement element : accounts) {
+            JsonObject account = element.getAsJsonObject();
+            if (accountId.equals(getString(account, "id"))) {
+                removed = true;
+            } else {
+                retained.add(account);
+            }
+        }
+        if (!removed) return;
+        store.add("accounts", retained);
+
+        String selectedId = store.has("selectedAccountId") ? parseString(store.get("selectedAccountId")) : null;
+        if (accountId.equals(selectedId)) {
+            if (retained.isEmpty()) {
+                store.remove("selectedAccountId");
+            } else {
+                store.addProperty("selectedAccountId",
+                        getString(retained.get(0).getAsJsonObject(), "id"));
+            }
         }
         saveAccountStore(store);
     }
@@ -249,9 +277,10 @@ public class Login {
         try {
             String token = manager.getMinecraftToken().getUpToDate().getToken();
             MinecraftProfile profile = manager.getMinecraftProfile().getUpToDate();
-            Account refreshed = new Account(selected.id(), profile.getName(), selected.type(), profile.getId().toString().replace("-", ""), token, JavaAuthManager.toJson(manager).toString());
+            String uuidAsString = profile.getId().toString().replace("-", "");
+            Account refreshed = new Account(selected.id(), profile.getName(), selected.type(), uuidAsString, token, JavaAuthManager.toJson(manager).toString());
             saveAccount(refreshed);
-            return new Session(profile.getName(), profile.getId().toString().replace("-", ""), token, "msa");
+            return new Session(profile.getName(), uuidAsString, token, "msa");
         } catch (IOException e) {
             logError("Failed to get Minecraft profile.", e);
             return null;
@@ -346,19 +375,10 @@ public class Login {
      * @return the created {@link JButton} instance
      */
     private static JButton showLoginButton(String url) {
-        GridBagConstraints constraints = new GridBagConstraints();
-        constraints.gridx = 0;
-        constraints.gridy = 1;
-        constraints.anchor = GridBagConstraints.CENTER;
-        constraints.fill = GridBagConstraints.HORIZONTAL;
-        constraints.weightx = 1;
-        constraints.weighty = 0;
-        constraints.insets = new Insets(10, 0, 0, 0);
-
         JButton button = new JButton("Login");
         button.setToolTipText(url);
         button.addActionListener(_ -> open(URI.create(url)));
-        SwingUtilities.invokeLater(() -> addItem(button, constraints));
+        SwingUtilities.invokeLater(() -> addItem(button));
         return button;
     }
 
