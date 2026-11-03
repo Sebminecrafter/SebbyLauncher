@@ -1,6 +1,7 @@
 package io.github.sebminecrafter.sebbylauncher.downloader;
 
 import com.google.gson.JsonElement;
+import io.github.sebminecrafter.sebbylauncher.LauncherDirs;
 
 import java.util.List;
 import java.util.Map;
@@ -18,6 +19,7 @@ public record VersionMeta(
         AssetIndexRef assetIndex,
         JavaVersion javaVersion,
         Arguments arguments,
+        String minecraftArguments,
         Map<String, DownloadInfo> downloads,
         List<Library> libraries
 ) {
@@ -27,7 +29,9 @@ public record VersionMeta(
 
     public record Artifact(String path, String sha1, long size, String url) {}
 
-    public record LibDownloads(Artifact artifact) {}
+    public record Extract(List<String> exclude) {}
+
+    public record LibDownloads(Artifact artifact, Map<String, DownloadInfo> classifiers) {}
 
     public record JavaVersion(String component, int majorVersion) {}
 
@@ -67,12 +71,37 @@ public record VersionMeta(
         }
     }
 
-    public record Library(String name, LibDownloads downloads, List<Rule> rules) {
+    public record Library(String name, LibDownloads downloads, Map<String, String> natives, Extract extract, List<Rule> rules) {
         /**
          * Whether this library is needed on the current platform.
          */
         public boolean appliesHere() {
             return Rule.allowed(rules);
+        }
+
+        public String nativeClassifier() {
+            if (natives == null || natives.isEmpty()) return null;
+            return natives.get(Platform.os());
+        }
+
+        public DownloadInfo nativeDownload() {
+            String classifier = nativeClassifier();
+            if (classifier == null || downloads == null || downloads.classifiers() == null) return null;
+            return downloads.classifiers().get(classifier);
+        }
+
+        public String nativeArtifactPath() {
+            String classifier = nativeClassifier();
+            if (classifier == null || name == null) return null;
+
+            String[] parts = name.split(":");
+            if (parts.length < 3) return null;
+
+            String group = parts[0].replace('.', '/');
+            String artifact = parts[1];
+            String version = parts[2];
+            String fileName = artifact + "-" + version + "-" + classifier + ".jar";
+            return LauncherDirs.LIBRARIES.resolve(group).resolve(artifact).resolve(version).resolve(fileName).toString();
         }
     }
 

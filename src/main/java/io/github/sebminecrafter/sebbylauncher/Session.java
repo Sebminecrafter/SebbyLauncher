@@ -6,8 +6,14 @@ package io.github.sebminecrafter.sebbylauncher;
  * @param name        player name
  * @param uuid        player UUID without dashes
  * @param accessToken Minecraft access token
+ * @param userType    account type used in launch arguments (legacy/MSA)
  */
-public record Session(String name, String uuid, String accessToken) {
+@SuppressWarnings("unused")
+public record Session(String name, String uuid, String accessToken, String userType) {
+    public Session(String name, String uuid, String accessToken) {
+        this(name, uuid, accessToken, "msa");
+    }
+
     /**
      * Leaves out the access token so it can't end up in logs.
      */

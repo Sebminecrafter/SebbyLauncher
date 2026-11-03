@@ -1,15 +1,17 @@
-UI todo:
+# UI todo
 
 The logo+title would get moved into the left tab bit,
 which would have tabs for:
- - Play/library (Instances)
- - News (News from minecraft.net, if possible, otherwise just launcher updates)
- - Accounts (Skins, account management).
- - Settings (a bunch of simple/common settings)
+
+- Play/library (Instances)
+- News (News from minecraft.net, if possible, otherwise just launcher updates)
+- Accounts (Skins, account management).
+- Settings (a bunch of simple/common settings)
 
 Example layout for sidebar/overall frame:
 (all the items on the sidebar would have images next to them)
-```
+
+```text
  ______________________________________________________________________________ 
 |SebbyLauncher                                                    | - | [] | X |
 |______________________________________________________________________________|
@@ -52,12 +54,13 @@ with a 3d model
 Settings page:
 A simple list of settings (maybe with sections if it gets long enough).
 Main settings would be:
- - Style/theme (swing builtins)
- - Color?
- - Delete saved resources (libraries/assets/client jars, opens small selector window and asks confirmation)
- - Load custom version.json
- - Check all instances for updates
- - Import/export settings
- - Anything else common or useful/needed here
+
+- Style/theme (swing builtins)
+- Color?
+- Delete saved resources (libraries/assets/client jars, opens small selector window and asks confirmation)
+- Load custom version.json
+- Check all instances for updates
+- Import/export settings
+- Anything else common or useful/needed here
 
 All of these could be in separate Java files (to make the code nicer and more readable), and the current Window code could be mostly rewritten.

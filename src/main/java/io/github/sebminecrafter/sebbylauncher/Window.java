@@ -22,6 +22,7 @@ public class Window {
     private static final JPanel sidebarFooter = new JPanel(new BorderLayout());
     private static final JPanel playScreen = new JPanel(new BorderLayout());
     private static final JComboBox<Instance> instanceSelector = new JComboBox<>();
+    private static final JComboBox<Login.Account> accountSelector = new JComboBox<>();
     private static final ButtonGroup nav = new ButtonGroup();
     private static final ImageIcon logoSourceIcon = new ImageIcon(Main.getImageAsset("Sebby64.png"));
     private static JLabel sidebarLogo;
@@ -29,11 +30,6 @@ public class Window {
     private static final int minWidth = 480;
     private static final int minHeight = 360;
     private static final Logger logger = new Logger("SebbyLauncher/Window");
-
-    // TODO: Add version, mod loader selectors
-    // TODO: Add separate instances
-    // TODO: Add separate profiles/accounts
-    // TODO: Add mod downloading/updating
 
     public void gui(boolean fullscreen) {
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -64,18 +60,20 @@ public class Window {
         });
 
         refreshInstanceSelector();
+        refreshAccountSelector();
         playScreen.add(createPlayControls(), BorderLayout.CENTER);
 
         addScreen("Play", playScreen);
         addScreen("News", createComingSoonScreen());
-        addScreen("Accounts", createComingSoonScreen());
+        addScreen("Accounts", createAccountsScreen());
         addScreen("Settings", createComingSoonScreen());
 
         frame.pack();
         frame.setSize(minWidth, minHeight);
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
-        if (fullscreen) frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+        if (fullscreen)
+            frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
     }
 
     private static JPanel createPlayControls() {
@@ -112,13 +110,62 @@ public class Window {
         constraints.gridx = 3;
         panel.add(editInstanceButton, constraints);
 
+        JLabel accountLabel = new JLabel("Account:");
+        constraints.gridx = 0;
+        constraints.gridy = 1;
+        panel.add(accountLabel, constraints);
+
+        constraints.gridx = 1;
+        constraints.weightx = 1;
+        accountSelector.addActionListener(_ -> {
+            Login.Account selected = (Login.Account) accountSelector.getSelectedItem();
+            if (selected != null) {
+                Login.setSelectedAccount(selected.id());
+            }
+        });
+        panel.add(accountSelector, constraints);
+
+        JButton offlineButton = new JButton("Offline");
+        offlineButton.addActionListener(_ -> {
+            String name = JOptionPane.showInputDialog(frame, "Choose a player name for the offline account:", "Add Offline Account", JOptionPane.PLAIN_MESSAGE);
+            if (name != null && !name.isBlank()) {
+                if (Login.addOfflineAccount(name)) {
+                    refreshAccountSelector();
+                }
+            }
+        });
+        constraints.gridx = 2;
+        constraints.weightx = 0;
+        panel.add(offlineButton, constraints);
+
+        JButton microsoftButton = new JButton("Microsoft");
+        microsoftButton.addActionListener(_ -> new SwingWorker<Boolean, Void>() {
+            @Override
+            protected Boolean doInBackground() {
+                return Login.login();
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    if (get()) {
+                        refreshAccountSelector();
+                    }
+                } catch (Exception ex) {
+                    logger.error("Failed to add Microsoft account: " + ex.getMessage());
+                }
+            }
+        }.execute());
+        constraints.gridx = 3;
+        panel.add(microsoftButton, constraints);
+
         ImageIcon playIcon = new ImageIcon(Main.getImageAsset("play1.png"));
         ImageIcon playIcon2 = new ImageIcon(Main.getImageAsset("play2.png"));
         JButton launch = new JButton("Play", playIcon);
         launch.setPressedIcon(playIcon2);
         launch.addActionListener(Window::onLaunch);
         constraints.gridx = 0;
-        constraints.gridy = 1;
+        constraints.gridy = 2;
         constraints.gridwidth = 4;
         constraints.weightx = 1;
         constraints.fill = GridBagConstraints.NONE;
@@ -142,6 +189,27 @@ public class Window {
         }
     }
 
+    private static void refreshAccountSelector() {
+        Login.Account selected = (Login.Account) accountSelector.getSelectedItem();
+        accountSelector.removeAllItems();
+        List<Login.Account> accounts = Login.getAccounts();
+        for (Login.Account account : accounts) {
+            accountSelector.addItem(account);
+        }
+
+        Login.Account current = Login.getSelectedAccount();
+        if (current != null) {
+            accountSelector.setSelectedItem(current);
+        } else if (accountSelector.getItemCount() > 0) {
+            accountSelector.setSelectedIndex(0);
+        }
+
+        if (selected != null && selected.id() != null && Login.getSelectedAccount() != null
+                && selected.id().equals(Login.getSelectedAccount().id())) {
+            accountSelector.setSelectedItem(selected);
+        }
+    }
+
     private static void openInstanceDialog(Instance existing) {
         JDialog dialog = new JDialog(frame, existing == null ? "New Instance" : "Edit Instance", true);
         dialog.setLayout(new GridBagLayout());
@@ -156,7 +224,8 @@ public class Window {
         JTextField loaderField = new JTextField(existing == null ? "Vanilla" : existing.loader(), 20);
         JTextField imageField = new JTextField(existing == null ? "Sebby64.png" : existing.image(), 20);
         JTextField memoryField = new JTextField(existing == null ? "2048" : String.valueOf(existing.memoryMb()), 10);
-        JTextField jvmArgsField = new JTextField(existing == null || existing.jvmArgs() == null ? "" : String.join(" ", existing.jvmArgs()), 30);
+        JTextField jvmArgsField = new JTextField(
+                existing == null || existing.jvmArgs() == null ? "" : String.join(" ", existing.jvmArgs()), 30);
         JTextField gameFolderField = new JTextField(existing == null ? "" : existing.gameFolder(), 20);
 
         addInstanceField(dialog, constraints, "Name", nameField, 0);
@@ -173,13 +242,15 @@ public class Window {
                 String name = Instance.sanitizeName(nameField.getText());
                 String version = versionField.getText() == null ? "latest" : versionField.getText().trim();
                 String loader = loaderField.getText() == null ? "Vanilla" : loaderField.getText().trim();
-                String image = imageField.getText() == null || imageField.getText().isBlank() ? "Sebby64.png" : imageField.getText().trim();
+                String image = imageField.getText() == null || imageField.getText().isBlank() ? "Sebby64.png"
+                        : imageField.getText().trim();
                 String memoryText = memoryField.getText() == null ? "2048" : memoryField.getText().trim();
                 int memoryMb = parseMemory(memoryText);
                 String jvmArgs = jvmArgsField.getText() == null ? "" : jvmArgsField.getText().trim();
-                List<String> jvmTokens = jvmArgs.isBlank() ? List.of() : Arrays.stream(jvmArgs.split("\\s+"))
-                        .filter(arg -> !arg.isBlank())
-                        .toList();
+                List<String> jvmTokens = jvmArgs.isBlank() ? List.of()
+                        : Arrays.stream(jvmArgs.split("\\s+"))
+                                .filter(arg -> !arg.isBlank())
+                                .toList();
                 String gameFolder = gameFolderField.getText() == null ? "" : gameFolderField.getText().trim();
 
                 Instance instance = new Instance(name, version, loader, image, memoryMb, jvmTokens, gameFolder);
@@ -205,7 +276,7 @@ public class Window {
     }
 
     private static void addInstanceField(Container parent, GridBagConstraints constraints, String labelText,
-                                        JTextField field, int rowIndex) {
+            JTextField field, int rowIndex) {
         constraints.gridx = 0;
         constraints.gridy = rowIndex;
         constraints.gridwidth = 1;
@@ -242,7 +313,8 @@ public class Window {
 
     private static void updateSidebarWidth() {
         int width = frame.getContentPane().getWidth();
-        if (width <= 0) return;
+        if (width <= 0)
+            return;
 
         int sidebarWidth = Math.clamp(Math.round(width * 0.22f), 150, 280);
         if (sidebar.getPreferredSize().width != sidebarWidth) {
@@ -253,7 +325,8 @@ public class Window {
     }
 
     private static void updateSidebarLogo() {
-        if (sidebarLogo == null || sidebar.getWidth() <= 0) return;
+        if (sidebarLogo == null || sidebar.getWidth() <= 0)
+            return;
 
         Insets insets = sidebarLogo.getInsets();
         int availableWidth = sidebar.getWidth() - insets.left - insets.right - 1;
@@ -264,13 +337,108 @@ public class Window {
             int iconSize = Math.min(fontSize, 24);
             int requiredWidth = iconSize + sidebarLogo.getIconTextGap()
                     + sidebarLogo.getFontMetrics(font).stringWidth(sidebarLogo.getText());
-            if (requiredWidth <= availableWidth) break;
+            if (requiredWidth <= availableWidth)
+                break;
             fontSize--;
         }
 
         Font font = baseFont.deriveFont((float) fontSize);
         sidebarLogo.setFont(font);
         sidebarLogo.setIcon(scaleIcon(logoSourceIcon, fontSize, fontSize));
+    }
+
+    private static JComponent createAccountsScreen() {
+        JPanel screen = new JPanel(new GridBagLayout());
+        screen.setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
+
+        GridBagConstraints constraints = new GridBagConstraints();
+        constraints.insets = new Insets(8, 8, 8, 8);
+        constraints.fill = GridBagConstraints.HORIZONTAL;
+
+        JLabel title = new JLabel("Accounts");
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 24f));
+        constraints.gridx = 0;
+        constraints.gridy = 0;
+        constraints.gridwidth = 2;
+        screen.add(title, constraints);
+
+        JLabel accountName = new JLabel("Selected account: " + Login.getSelectedAccountName());
+        constraints.gridy = 1;
+        constraints.gridwidth = 2;
+        screen.add(accountName, constraints);
+
+        JComboBox<Login.Account> accountList = new JComboBox<>();
+        for (Login.Account account : Login.getAccounts()) {
+            accountList.addItem(account);
+        }
+        Login.Account selected = Login.getSelectedAccount();
+        if (selected != null) {
+            accountList.setSelectedItem(selected);
+        }
+        accountList.addActionListener(_ -> {
+            Login.Account choice = (Login.Account) accountList.getSelectedItem();
+            if (choice != null) {
+                Login.setSelectedAccount(choice.id());
+                accountName.setText("Selected account: " + Login.getSelectedAccountName());
+            }
+        });
+        constraints.gridy = 2;
+        constraints.gridwidth = 2;
+        constraints.weightx = 1;
+        screen.add(accountList, constraints);
+
+        JButton offlineButton = new JButton("Add Offline Account");
+        offlineButton.addActionListener(_ -> {
+            String name = JOptionPane.showInputDialog(frame, "Choose a player name:", "Add Offline Account", JOptionPane.PLAIN_MESSAGE);
+            if (name != null && !name.isBlank()) {
+                if (Login.addOfflineAccount(name)) {
+                    refreshAccountSelector();
+                    accountName.setText("Selected account: " + Login.getSelectedAccountName());
+                    accountList.removeAllItems();
+                    for (Login.Account item : Login.getAccounts()) {
+                        accountList.addItem(item);
+                    }
+                    if (Login.getSelectedAccount() != null) {
+                        accountList.setSelectedItem(Login.getSelectedAccount());
+                    }
+                }
+            }
+        });
+        constraints.gridy = 3;
+        constraints.gridwidth = 1;
+        constraints.weightx = 0.5;
+        screen.add(offlineButton, constraints);
+
+        JButton microsoftButton = new JButton("Add Microsoft Account");
+        microsoftButton.addActionListener(_ -> new SwingWorker<Boolean, Void>() {
+            @Override
+            protected Boolean doInBackground() {
+                return Login.login();
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    if (get()) {
+                        refreshAccountSelector();
+                        accountName.setText("Selected account: " + Login.getSelectedAccountName());
+                        accountList.removeAllItems();
+                        for (Login.Account item : Login.getAccounts()) {
+                            accountList.addItem(item);
+                        }
+                        if (Login.getSelectedAccount() != null) {
+                            accountList.setSelectedItem(Login.getSelectedAccount());
+                        }
+                    }
+                } catch (Exception ex) {
+                    logger.error("Failed to add Microsoft account: " + ex.getMessage());
+                }
+            }
+        }.execute());
+        constraints.gridx = 1;
+        screen.add(microsoftButton, constraints);
+
+        return screen;
     }
 
     private static JComponent createComingSoonScreen() {
@@ -326,10 +494,12 @@ public class Window {
     }
 
     /**
-     * Adds an item to the main pane on the AWT thread using the given component and constraints
+     * Adds an item to the main pane on the AWT thread using the given component and
+     * constraints
+     * 
      * @param comp {@link JComponent} to add to the pane
-     * @param gbc {@link GridBagConstraints} to use when adding {@code comp}
-     * */
+     * @param gbc  {@link GridBagConstraints} to use when adding {@code comp}
+     */
     public static void addItem(JComponent comp, GridBagConstraints gbc) {
         SwingUtilities.invokeLater(() -> {
             playScreen.add(comp, gbc);
@@ -338,7 +508,6 @@ public class Window {
             frame.revalidate();
         });
     }
-
 
     private static void addScreen(String name, JComponent screen) {
         content.add(screen, name);

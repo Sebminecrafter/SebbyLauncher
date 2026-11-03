@@ -31,8 +31,8 @@ public class Main {
 
     private static void startupMessage() {
         io.github.sebminecrafter.sebbylogger.Utils.printVersion();
-        logger.info("SebbyLauncher started.     ");
-        logger.info("   --- SebbyLauncher ---   ");
+        logger.info(LauncherDetails.NAME + " " + LauncherDetails.VERSION);
+        logger.info("Built at " + LauncherDetails.BUILD_TIME);
         logger.info("An epic Minecraft launcher ");
         logger.info("Made by Sebminecrafter     ");
     }

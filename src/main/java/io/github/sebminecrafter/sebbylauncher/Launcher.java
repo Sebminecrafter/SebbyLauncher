@@ -29,7 +29,8 @@ public class Launcher {
     }
 
     /**
-     * Launches the latest release. Blocks while downloading, so don't call it on the UI thread.
+     * Launches the latest release. Blocks while downloading, so don't call it on
+     * the UI thread.
      *
      * @return true if the game was started
      */
@@ -45,9 +46,10 @@ public class Launcher {
         }
 
         String requestedVersion = instance.version();
-        String version = requestedVersion == null || requestedVersion.isBlank() || requestedVersion.equalsIgnoreCase("latest")
-                ? downloader.getLatestVersion(false)
-                : requestedVersion;
+        String version = requestedVersion == null || requestedVersion.isBlank()
+                || requestedVersion.equalsIgnoreCase("latest")
+                        ? downloader.getLatestVersion(false)
+                        : requestedVersion;
         if (version == null) {
             logger.error("Couldn't find the latest version.");
             return false;
@@ -56,10 +58,12 @@ public class Launcher {
     }
 
     /**
-     * Downloads (if needed) and starts the given version. Blocks until the game process
+     * Downloads (if needed) and starts the given version. Blocks until the game
+     * process
      * has started, not until it exits. Don't call it on the UI thread.
      *
-     * @param version One of the strings returned by {@link Downloader#listVersions()}
+     * @param version One of the strings returned by
+     *                {@link Downloader#listVersions()}
      * @return true if the game was started
      */
     public boolean launchGame(String version) {
@@ -69,17 +73,27 @@ public class Launcher {
     private boolean launchGame(String version, Instance instance) {
         logger.info("Starting game " + version + "...");
         try {
-            VersionMeta meta = downloader.getVersionMeta(version);
-            if (meta == null) return false;
+            String loader = instance == null ? "Vanilla" : instance.loader();
+            VersionMeta meta = downloader.getVersionMeta(version, loader);
+            if (meta == null)
+                return false;
 
             int requiredJava = meta.javaVersion() == null ? 8 : meta.javaVersion().majorVersion();
-            if (Runtime.version().feature() < requiredJava) {
-                logger.error(version + " needs Java " + requiredJava + ", but the launcher runs on Java " + Runtime.version().feature());
+            boolean legacyRuntime = meta.javaVersion() != null
+                    && "jre-legacy".equals(meta.javaVersion().component());
+            if (!legacyRuntime && Runtime.version().feature() < requiredJava) {
+                logger.error(version + " needs Java " + requiredJava + ", but the launcher runs on Java "
+                        + Runtime.version().feature());
                 return false;
             }
+            Path javaExecutable = legacyRuntime
+                    ? downloader.downloadJavaRuntime(meta.javaVersion())
+                    : Path.of(System.getProperty("java.home"), "bin", "java");
 
             Path clientJar = downloader.downloadClient(meta);
-            List<Path> classpath = new ArrayList<>(downloader.downloadLibraries(meta));
+            Path nativesDir = LauncherDirs.VERSIONS.resolve(version).resolve("natives");
+            Files.createDirectories(nativesDir);
+            List<Path> classpath = new ArrayList<>(downloader.downloadLibraries(meta, nativesDir));
             classpath.add(clientJar);
             downloader.downloadAssets(meta);
 
@@ -89,14 +103,14 @@ public class Launcher {
                 return false;
             }
 
-            Path gameDir = instance == null ? LauncherDirs.INSTANCES.resolve(DEFAULT_INSTANCE) : instance.gameDirectory();
-            Path nativesDir = LauncherDirs.VERSIONS.resolve(version).resolve("natives");
+            Path gameDir = instance == null ? LauncherDirs.INSTANCES.resolve(DEFAULT_INSTANCE)
+                    : instance.gameDirectory();
             Files.createDirectories(gameDir);
-            Files.createDirectories(nativesDir);
 
-            String jvmArgs = instance == null ? "" : String.join(" ", instance.jvmArgs() == null ? List.of() : instance.jvmArgs());
+            String jvmArgs = instance == null ? ""
+                    : String.join(" ", instance.jvmArgs() == null ? List.of() : instance.jvmArgs());
             List<String> command = LaunchCommand.build(meta, session, gameDir, nativesDir, classpath,
-                    instance == null ? 2048 : instance.memoryMb(), jvmArgs);
+                    instance == null ? 2048 : instance.memoryMb(), jvmArgs, javaExecutable);
             logger.debug("Command: " + LaunchCommand.redact(command));
 
             start(command, gameDir);

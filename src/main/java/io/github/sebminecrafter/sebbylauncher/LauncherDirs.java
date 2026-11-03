@@ -13,7 +13,8 @@ public final class LauncherDirs {
     public static final Path LIBRARIES = ROOT.resolve("libraries");
     public static final Path INSTANCES = ROOT.resolve("instances");
     public static final Path ASSETS = ROOT.resolve("assets");
-    private static final Path[] paths = {ROOT, TOKENS, VERSIONS, LIBRARIES, INSTANCES, ASSETS};
+    public static final Path RUNTIMES = ROOT.resolve("runtimes");
+    private static final Path[] paths = {ROOT, TOKENS, VERSIONS, LIBRARIES, INSTANCES, ASSETS, RUNTIMES};
 
     /**
      * Prevent instantiation
