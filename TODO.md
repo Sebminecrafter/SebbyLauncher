@@ -23,7 +23,7 @@
 
 - [ ] Download and update mods in each instance's `mods` folder using Modrinth.
 - [ ] Filter results by Minecraft version and loader.
-- [ ] Send a unique `User-Agent` with Modrinth API requests. 
+- [ ] Send a unique `User-Agent` with Modrinth API requests.
   (User agent: `SebbyLauncher/version`, use placeholders from )
 
 ## 5. Multiple accounts
@@ -41,4 +41,5 @@
 
 ## 7. Improvements
 
-- [ ] Selecting custom runtimes
+- [ ] Selecting custom JREs
+- [ ] Separate mods page on left bar, like Modrinth App
