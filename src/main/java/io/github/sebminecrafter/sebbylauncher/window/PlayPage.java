@@ -136,7 +136,7 @@ public final class PlayPage {
         JButton edit = new JButton("Instance settings");
         edit.addActionListener(_ -> openInstanceDialog(instance));
         actions.add(edit);
-        JButton manageMods = new JButton("Manage mods");
+        JButton manageMods = new JButton("Manage mods & packs");
         manageMods.addActionListener(_ -> ModsDialog.open(instance));
         actions.add(manageMods);
         JButton delete = new JButton("Delete instance");
