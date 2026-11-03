@@ -34,3 +34,4 @@ build/
 run/
 target/
 **tokens.json**
+dependency-reduced-pom.xml

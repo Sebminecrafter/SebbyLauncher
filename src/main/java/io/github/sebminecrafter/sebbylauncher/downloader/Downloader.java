@@ -22,7 +22,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
-@SuppressWarnings("unused")
 public class Downloader {
     private static final String MANIFEST_URL = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
     private static final Logger logger = new Logger("SebbyLauncher/Downloader");
@@ -93,7 +92,8 @@ public class Downloader {
     }
 
     /**
-     * Loads the version JSON for the given ID, downloading it if it is not saved yet.
+     * Loads the version JSON for the given ID, downloading it if it is not saved
+     * yet.
      *
      * @param version One of the strings returned by listVersions()
      * @return the parsed version JSON, or null if the version is invalid
@@ -109,12 +109,25 @@ public class Downloader {
             }
             String url = entry.get("url").getAsString();
             logger.debug("Fetching version JSON: " + url);
-            downloadVerified(url, file, entry.get("sha1").getAsString());
+            downloadVerified(url, file, versionMetaSha1(entry, url));
         }
 
         try (Reader reader = Files.newBufferedReader(file)) {
             return GSON.fromJson(reader, VersionMeta.class);
         }
+    }
+
+    private static String versionMetaSha1(JsonObject entry, String url) throws IOException {
+        JsonElement sha1 = entry.get("sha1");
+        if (sha1 != null && !sha1.isJsonNull()) return sha1.getAsString();
+
+        String[] segments = URI.create(url).getPath().split("/");
+        for (int i = 0; i < segments.length - 1; i++) {
+            if (segments[i].equals("packages") && segments[i + 1].matches("[0-9a-fA-F]{40}")) {
+                return segments[i + 1];
+            }
+        }
+        throw new IOException("Version manifest entry has no SHA-1 checksum: " + url);
     }
 
     /**
@@ -142,7 +155,8 @@ public class Downloader {
     }
 
     /**
-     * Downloads the asset index and every asset it lists that is missing or the wrong size.
+     * Downloads the asset index and every asset it lists that is missing or the
+     * wrong size.
      * Files are downloaded in parallel.
      */
     public void downloadAssets(VersionMeta meta) throws IOException {
@@ -162,7 +176,8 @@ public class Downloader {
 
         // several names can share one file, so dedupe by hash
         Map<String, AssetIndex.AssetObject> unique = new HashMap<>();
-        for (AssetIndex.AssetObject obj : index.objects().values()) unique.putIfAbsent(obj.hash(), obj);
+        for (AssetIndex.AssetObject obj : index.objects().values())
+            unique.putIfAbsent(obj.hash(), obj);
 
         List<AssetIndex.AssetObject> missing = new ArrayList<>();
         for (AssetIndex.AssetObject obj : unique.values()) {
@@ -214,13 +229,9 @@ public class Downloader {
             JsonObject manifest = getManifest();
             JsonObject latest = manifest.getAsJsonObject("latest");
 
-            String version = snapshot
-                    ? latest.get("snapshot").getAsString()
-                    : latest.get("release").getAsString();
+            String version = snapshot ? latest.get("snapshot").getAsString() : latest.get("release").getAsString();
 
-            logger.info(
-                    "Latest Minecraft " + (snapshot ? "snapshot" : "release") + ": " + version
-            );
+            logger.info("Latest Minecraft " + (snapshot ? "snapshot" : "release") + ": " + version);
 
             return version;
         } catch (Exception e) {
@@ -294,8 +305,7 @@ public class Downloader {
     private JsonObject readJsonFromUrl(String urlStr) throws IOException {
         HttpURLConnection conn = open(urlStr);
 
-        try (InputStream in = conn.getInputStream();
-             Reader reader = new InputStreamReader(in)) {
+        try (InputStream in = conn.getInputStream(); Reader reader = new InputStreamReader(in)) {
             return JsonParser.parseReader(reader).getAsJsonObject();
         }
     }
