@@ -33,7 +33,8 @@ class ModrinthClientTest {
             userAgent.set(exchange.getRequestHeaders().getFirst("User-Agent"));
             respond(exchange, """
                     {"hits":[{"project_id":"abc123","slug":"example","title":"Example Mod",
-                    "description":"A test mod","downloads":12}]}
+                    "description":"A test mod","icon_url":"https://cdn.modrinth.com/icon.png",
+                    "downloads":12}]}
                     """);
         })) {
             ModrinthClient client = new ModrinthClient(
@@ -43,6 +44,7 @@ class ModrinthClientTest {
 
             assertEquals(1, results.size());
             assertEquals("abc123", results.getFirst().projectId());
+            assertEquals("https://cdn.modrinth.com/icon.png", results.getFirst().iconUrl());
             assertEquals(ContentType.MOD, results.getFirst().type());
             assertEquals(LauncherDetails.NAME + "/" + LauncherDetails.VERSION, userAgent.get());
             String decodedQuery = URLDecoder.decode(requestPath.get(), StandardCharsets.UTF_8);
@@ -65,6 +67,7 @@ class ModrinthClientTest {
             assertEquals(0, client.search("", "1.21", "Fabric", ContentType.SHADER_PACK).size());
 
             String decodedQuery = URLDecoder.decode(requestPath.get(), StandardCharsets.UTF_8);
+            assertTrue(decodedQuery.contains("query=&limit=20"));
             assertTrue(decodedQuery.contains("versions:1.21"));
             assertTrue(decodedQuery.contains("project_type:shader"));
             assertFalse(decodedQuery.contains("categories:"));

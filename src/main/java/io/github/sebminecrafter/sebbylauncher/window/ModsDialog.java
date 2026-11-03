@@ -7,15 +7,24 @@ import io.github.sebminecrafter.sebbylauncher.mods.ModrinthClient.ContentUpdate;
 import io.github.sebminecrafter.sebbylauncher.mods.ModrinthClient.InstalledContent;
 import io.github.sebminecrafter.sebbylauncher.mods.ModrinthClient.Project;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.AbstractTableModel;
 import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import static io.github.sebminecrafter.sebbylauncher.GuiHelpers.openFolder;
@@ -44,6 +53,10 @@ final class ModsDialog {
             contentTabs.put(type, tab);
             categories.addTab(tabTitle(type), tab.panel);
         }
+        categories.addChangeListener(_ -> {
+            ContentTab selectedTab = contentTabs.get(ContentType.values()[categories.getSelectedIndex()]);
+            if (!selectedTab.hasSearched) selectedTab.search();
+        });
         dialog.add(categories, BorderLayout.CENTER);
         status.setBorder(new EmptyBorder(4, 0, 0, 0));
         dialog.add(status, BorderLayout.SOUTH);
@@ -52,6 +65,7 @@ final class ModsDialog {
     static void open(Instance instance) {
         ModsDialog modsDialog = new ModsDialog(instance);
         modsDialog.contentTabs.values().forEach(ContentTab::refreshInstalled);
+        modsDialog.contentTabs.get(ContentType.MOD).search();
         modsDialog.dialog.setVisible(true);
     }
 
@@ -89,6 +103,7 @@ final class ModsDialog {
         private final JButton updateAllButton = new JButton("Update all available");
         private final JButton removeButton = new JButton("Remove selected");
         private List<ContentUpdate> updates = List.of();
+        private boolean hasSearched;
 
         private ContentTab(ContentType type) {
             this.type = type;
@@ -122,7 +137,7 @@ final class ModsDialog {
             searchBar.add(searchButton, BorderLayout.EAST);
             browse.add(searchBar, BorderLayout.NORTH);
 
-            projectList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            projectList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
             projectList.setCellRenderer(new ProjectRenderer());
             projectList.addListSelectionListener(_ -> showProjectDetails());
             projectDescription.setEditable(false);
@@ -166,6 +181,7 @@ final class ModsDialog {
         }
 
         private void search() {
+            hasSearched = true;
             String query = queryField.getText().trim();
             searchButton.setEnabled(false);
             status.setText("Searching Modrinth for " + type.pluralLabel() + "…");
@@ -192,41 +208,63 @@ final class ModsDialog {
         }
 
         private void showProjectDetails() {
-            Project selected = projectList.getSelectedValue();
-            installButton.setEnabled(selected != null);
-            if (selected == null) {
+            List<Project> selected = projectList.getSelectedValuesList();
+            installButton.setEnabled(!selected.isEmpty());
+            if (selected.isEmpty()) {
                 projectDescription.setText("");
                 return;
             }
-            String description = selected.description() == null ? "" : selected.description();
+            if (selected.size() > 1) {
+                projectDescription.setText("<html><body style='font-family:sans-serif;padding:8px'>"
+                        + "<h2>" + selected.size() + " projects selected</h2>"
+                        + "<p>Install selected to download all of them.</p></body></html>");
+                return;
+            }
+            Project project = selected.getFirst();
+            String description = project.description() == null ? "" : project.description();
             projectDescription.setText("<html><body style='font-family:sans-serif;padding:8px'>"
-                    + "<h2>" + PlayPage.escapeHtml(selected.title()) + "</h2><p>"
+                    + "<h2>" + PlayPage.escapeHtml(project.title()) + "</h2><p>"
                     + PlayPage.escapeHtml(description).replace("\n", "<br>")
-                    + "</p><p>" + String.format("%,d downloads", selected.downloads())
+                    + "</p><p>" + String.format("%,d downloads", project.downloads())
                     + "</p></body></html>");
             projectDescription.setCaretPosition(0);
         }
 
         private void installSelected() {
-            Project selected = projectList.getSelectedValue();
-            if (selected == null) return;
+            List<Project> selected = projectList.getSelectedValuesList();
+            if (selected.isEmpty()) return;
             installButton.setEnabled(false);
-            status.setText("Downloading " + selected.title() + "…");
-            new SwingWorker<InstalledContent, Void>() {
+            status.setText("Downloading " + selected.size() + " " + type.pluralLabel() + "…");
+            new SwingWorker<InstallResult, Void>() {
                 @Override
-                protected InstalledContent doInBackground() throws Exception {
-                    return client.install(instance, selected);
+                protected InstallResult doInBackground() throws Exception {
+                    List<InstalledContent> installed = new ArrayList<>();
+                    List<String> failures = new ArrayList<>();
+                    for (Project project : selected) {
+                        try {
+                            installed.add(client.install(instance, project));
+                        } catch (IOException e) {
+                            failures.add(project + ": " + e.getMessage());
+                        }
+                    }
+                    return new InstallResult(installed, failures);
                 }
 
                 @Override
                 protected void done() {
-                    installButton.setEnabled(projectList.getSelectedValue() != null);
+                    installButton.setEnabled(!projectList.isSelectionEmpty());
                     try {
-                        InstalledContent installed = get();
-                        status.setText("Installed " + installed.title() + " as " + installed.fileName() + ".");
+                        InstallResult result = get();
+                        status.setText("Installed " + result.installed().size() + " of "
+                                + selected.size() + " " + type.pluralLabel() + ".");
+                        if (!result.failures().isEmpty()) {
+                            showFailure(type.label() + " downloads failed",
+                                    new IOException(String.join(System.lineSeparator(), result.failures())));
+                        }
                         refreshInstalled();
                     } catch (Exception e) {
                         showFailure(type.label() + " could not be installed", e);
+                        refreshInstalled();
                     }
                 }
             }.execute();
@@ -471,18 +509,92 @@ final class ModsDialog {
 
     private record InstalledRow(InstalledContent installed, ContentUpdate update) {}
 
+    private record InstallResult(List<InstalledContent> installed, List<String> failures) {}
+
     private static final class ProjectRenderer extends DefaultListCellRenderer {
+        private static final int ICON_SIZE = 48;
+        private static final int MAX_ICON_BYTES = 2 * 1024 * 1024;
+        private final Map<String, Icon> icons = new HashMap<>();
+        private final Set<String> loadingIcons = new HashSet<>();
+        private final Set<String> failedIcons = new HashSet<>();
+
         @Override
         public Component getListCellRendererComponent(JList<?> list, Object value, int index,
                                                       boolean selected, boolean focus) {
             JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, selected, focus);
             if (value instanceof Project project) {
+                label.setIcon(project.iconUrl() == null ? null : icons.get(project.iconUrl()));
+                label.setIconTextGap(8);
                 label.setText("<html><b>" + PlayPage.escapeHtml(project.title()) + "</b>  ·  "
                         + String.format("%,d downloads", project.downloads()) + "<br>"
                         + PlayPage.escapeHtml(project.description()) + "</html>");
                 label.setBorder(BorderFactory.createEmptyBorder(5, 6, 5, 6));
+                loadIconWhenNeeded(list, project);
             }
             return label;
+        }
+
+        private void loadIconWhenNeeded(JList<?> list, Project project) {
+            String iconUrl = project.iconUrl();
+            if (iconUrl == null || icons.containsKey(iconUrl) || failedIcons.contains(iconUrl)
+                    || !loadingIcons.add(iconUrl)) return;
+            new SwingWorker<Icon, Void>() {
+                @Override
+                protected Icon doInBackground() throws Exception {
+                    URI uri;
+                    try {
+                        uri = URI.create(iconUrl);
+                    } catch (IllegalArgumentException e) {
+                        throw new IOException("Modrinth returned an invalid project icon URL.", e);
+                    }
+                    if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null
+                            || uri.getUserInfo() != null
+                            || !(uri.getHost().equalsIgnoreCase("modrinth.com")
+                            || uri.getHost().toLowerCase(java.util.Locale.ROOT).endsWith(".modrinth.com"))) {
+                        throw new IOException("Refusing an unsafe project icon URL.");
+                    }
+
+                    HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
+                    connection.setConnectTimeout(5000);
+                    connection.setReadTimeout(10000);
+                    connection.setInstanceFollowRedirects(false);
+                    try {
+                        int responseCode = connection.getResponseCode();
+                        if (responseCode < 200 || responseCode >= 300) {
+                            throw new IOException("Project icon request returned HTTP " + responseCode + ".");
+                        }
+                        if (connection.getContentLengthLong() > MAX_ICON_BYTES) {
+                            throw new IOException("Project icon exceeds the maximum allowed size.");
+                        }
+                        try (var input = connection.getInputStream()) {
+                            byte[] bytes = input.readNBytes(MAX_ICON_BYTES + 1);
+                            if (bytes.length > MAX_ICON_BYTES) {
+                                throw new IOException("Project icon exceeds the maximum allowed size.");
+                            }
+                            BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
+                            if (image == null) throw new IOException("Modrinth returned an invalid project icon.");
+                            Image scaledImage = image.getScaledInstance(ICON_SIZE, ICON_SIZE, Image.SCALE_SMOOTH);
+                            return new ImageIcon(scaledImage);
+                        }
+                    } finally {
+                        connection.disconnect();
+                    }
+                }
+
+                @Override
+                protected void done() {
+                    loadingIcons.remove(iconUrl);
+                    try {
+                        icons.put(iconUrl, get());
+                        list.repaint();
+                    } catch (Exception e) {
+                        failedIcons.add(iconUrl);
+                        Throwable cause = e instanceof ExecutionException && e.getCause() != null
+                                ? e.getCause() : e;
+                        logger.debug("Modrinth project icon could not be loaded: " + cause.getMessage());
+                    }
+                }
+            }.execute();
         }
     }
 }

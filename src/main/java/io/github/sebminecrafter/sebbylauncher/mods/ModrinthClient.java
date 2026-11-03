@@ -81,6 +81,7 @@ public final class ModrinthClient {
                     optionalString(hit, "slug"),
                     optionalString(hit, "title"),
                     optionalString(hit, "description"),
+                    optionalString(hit, "icon_url"),
                     hit.has("downloads") && !hit.get("downloads").isJsonNull()
                             ? hit.get("downloads").getAsLong() : 0));
         }
@@ -103,7 +104,7 @@ public final class ModrinthClient {
                 boolean directoryPack = type != ContentType.MOD
                         && Files.isDirectory(file, LinkOption.NOFOLLOW_LINKS);
                 boolean regularFile = Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS);
-                if (!directoryPack && (!regularFile || !isManagedFileName(type, fileName))) continue;
+                if (!directoryPack && (!regularFile || isNotManagedFileName(type, fileName))) continue;
                 installed.add(new InstalledContent(type, fileName, regularFile ? sha1(file) : null,
                         !fileName.endsWith(".disabled"),
                         null, null, null, null));
@@ -329,7 +330,7 @@ public final class ModrinthClient {
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new IOException("Modrinth returned HTTP " + response.statusCode() + ".");
             }
-            return parseObject(readLimited(body, MAX_API_RESPONSE_BYTES));
+            return parseObject(readLimited(body));
         }
     }
 
@@ -340,7 +341,7 @@ public final class ModrinthClient {
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new IOException("Modrinth returned HTTP " + response.statusCode() + " for " + uri.getPath());
             }
-            return readLimited(body, MAX_API_RESPONSE_BYTES);
+            return readLimited(body);
         }
     }
 
@@ -350,9 +351,9 @@ public final class ModrinthClient {
         return element.getAsJsonObject();
     }
 
-    private static byte[] readLimited(InputStream input, long limit) throws IOException {
-        byte[] data = input.readNBytes((int) limit + 1);
-        if (data.length > limit) throw new IOException("Modrinth response exceeded the size limit.");
+    private static byte[] readLimited(InputStream input) throws IOException {
+        byte[] data = input.readNBytes((int) ModrinthClient.MAX_API_RESPONSE_BYTES + 1);
+        if (data.length > ModrinthClient.MAX_API_RESPONSE_BYTES) throw new IOException("Modrinth response exceeded the size limit.");
         return data;
     }
 
@@ -440,18 +441,18 @@ public final class ModrinthClient {
         if (Files.isSymbolicLink(file)) throw new IOException("Refusing to access a symbolic link: " + fileName);
         boolean directoryPack = type != ContentType.MOD && Files.isDirectory(file, LinkOption.NOFOLLOW_LINKS);
         if (directoryPack) return file;
-        if (!isManagedFileName(type, fileName)
+        if (isNotManagedFileName(type, fileName)
                 || !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
             throw new IOException("Installed file is missing: " + fileName);
         }
         return file;
     }
 
-    private static boolean isManagedFileName(ContentType type, String fileName) {
+    private static boolean isNotManagedFileName(ContentType type, String fileName) {
         String activeName = fileName.endsWith(".disabled")
                 ? fileName.substring(0, fileName.length() - ".disabled".length()) : fileName;
         String extension = type == ContentType.MOD ? ".jar" : ".zip";
-        return activeName.toLowerCase(Locale.ROOT).endsWith(extension);
+        return !activeName.toLowerCase(Locale.ROOT).endsWith(extension);
     }
 
     private static JsonObject primaryFile(JsonObject version) throws IOException {
@@ -603,7 +604,7 @@ public final class ModrinthClient {
     }
 
     public record Project(ContentType type, String projectId, String slug, String title,
-                          String description, long downloads) {
+                          String description, String iconUrl, long downloads) {
         @Override
         public String toString() {
             return title == null || title.isBlank() ? projectId : title;
