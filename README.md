@@ -18,6 +18,7 @@ It features:
 * Separate instance folders (configurable)
 * Mod loaders
 * Selectable Fabric and Quilt loader versions per instance
+* Optional custom Java executable selection, with automatic Java-version checks
 * Mod and pack downloading through Modrinth, filtered for an instance's Minecraft version
 * Custom instance images, stored as PNGs in each instance folder
 * Minecraft news rendered in an embedded JavaFX WebView

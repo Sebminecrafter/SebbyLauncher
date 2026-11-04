@@ -28,9 +28,7 @@ public final class PlayPage {
 
         JPanel library = new JPanel(new BorderLayout(8, 12));
         JPanel header = new JPanel(new BorderLayout());
-        JLabel title = new JLabel("Instances");
-        title.setFont(title.getFont().deriveFont(Font.BOLD, 24f));
-        header.add(title, BorderLayout.WEST);
+        header.add(pageTitle("Instances"), BorderLayout.WEST);
         JButton newInstanceButton = new JButton("Add instance");
         newInstanceButton.addActionListener(_ -> openInstanceDialog(null));
         header.add(newInstanceButton, BorderLayout.EAST);
@@ -40,8 +38,8 @@ public final class PlayPage {
         library.add(new JScrollPane(instanceGrid), BorderLayout.CENTER);
 
         instanceOptions.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(Color.GRAY),
-                BorderFactory.createEmptyBorder(12, 12, 12, 12)));
+                BorderFactory.createTitledBorder("Selected instance"),
+                BorderFactory.createEmptyBorder(8, 8, 8, 8)));
         instanceOptions.setPreferredSize(new Dimension(250, 300));
         refreshInstanceOptions();
 
@@ -56,6 +54,7 @@ public final class PlayPage {
             }
         });
         JPanel accountRow = new JPanel(new BorderLayout(8, 0));
+        accountRow.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
         accountRow.add(new JLabel("Account"), BorderLayout.WEST);
         accountRow.add(accountSelector, BorderLayout.CENTER);
         JButton manageAccounts = new JButton("Manage accounts");
@@ -85,7 +84,7 @@ public final class PlayPage {
                     : BorderFactory.createEtchedBorder());
             tile.addActionListener(_ -> {
                 instanceSelector.setSelectedItem(instance);
-                refreshInstanceGrid();
+                updateInstanceGridSelection();
                 refreshInstanceOptions();
             });
             tile.addMouseListener(new MouseAdapter() {
@@ -101,6 +100,18 @@ public final class PlayPage {
         }
         instanceGrid.revalidate();
         instanceGrid.repaint();
+    }
+
+    private static void updateInstanceGridSelection() {
+        Color accent = UIManager.getColor("Component.focusColor");
+        if (accent == null) accent = new Color(79, 109, 138);
+        for (int i = 0; i < instanceGrid.getComponentCount(); i++) {
+            JButton tile = (JButton) instanceGrid.getComponent(i);
+            Instance instance = instanceSelector.getItemAt(i);
+            tile.setBorder(instance.equals(instanceSelector.getSelectedItem())
+                    ? BorderFactory.createLineBorder(accent, 2)
+                    : BorderFactory.createEtchedBorder());
+        }
     }
 
     private static void refreshInstanceOptions() {
@@ -149,7 +160,6 @@ public final class PlayPage {
         launchButton.setPressedIcon(new ImageIcon(Main.getImageAsset("play2.png")));
         launchButton.addActionListener(Window::onLaunch);
         actions.add(launchButton);
-        actions.add(new JLabel("Double-click an instance to launch it."));
         instanceOptions.add(actions, BorderLayout.SOUTH);
         instanceOptions.revalidate();
         instanceOptions.repaint();

@@ -21,23 +21,33 @@ import java.util.Map;
 import static io.github.sebminecrafter.sebbylauncher.window.Window.*;
 
 public final class SettingsPage {
+    private static boolean updatingThemeSelector;
+
     private SettingsPage() {}
 
     static JComponent create() {
         JPanel screen = new JPanel(new BorderLayout(8, 8));
         screen.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-        JLabel title = new JLabel("Settings");
-        title.setFont(title.getFont().deriveFont(Font.BOLD, 24f));
-        screen.add(title, BorderLayout.NORTH);
+        screen.add(pageTitle("Settings"), BorderLayout.NORTH);
 
         JPanel sections = new JPanel();
         sections.setLayout(new BoxLayout(sections, BoxLayout.Y_AXIS));
+        sections.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
         sections.add(createAppearanceSettings());
+        sections.add(Box.createVerticalStrut(8));
+        sections.add(createJavaRuntimeSettings());
+        sections.add(Box.createVerticalStrut(8));
         sections.add(createResourceSettings());
+        sections.add(Box.createVerticalStrut(8));
         sections.add(createImportExportSettings());
+        sections.add(Box.createVerticalStrut(8));
         sections.add(createMaintenanceSettings());
-        screen.add(new JScrollPane(sections), BorderLayout.CENTER);
+        JScrollPane settingsScroll = new JScrollPane(sections);
+        settingsScroll.setBorder(null);
+        settingsScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        screen.add(settingsScroll, BorderLayout.CENTER);
         settingsStatus = new JLabel(" ");
+        settingsStatus.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
         screen.add(settingsStatus, BorderLayout.SOUTH);
         return screen;
     }
@@ -49,26 +59,20 @@ public final class SettingsPage {
         c.insets = new Insets(5, 6, 5, 6);
         c.anchor = GridBagConstraints.WEST;
 
-        JComboBox<String> themes = new JComboBox<>();
+        themeSelector = new JComboBox<>();
+        JComboBox<String> themes = themeSelector;
         themes.addItem("System");
         for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
             themes.addItem(info.getName());
         }
-        String currentTheme = preferences.lookAndFeel();
-        if (currentTheme != null && !currentTheme.equals("System")) {
-            for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
-                if (info.getClassName().equals(currentTheme) || info.getName().equals(currentTheme)) {
-                    themes.setSelectedItem(info.getName());
-                    break;
-                }
-            }
-        }
+        refreshThemeSelection();
         c.gridx = 0;
         c.gridy = 0;
         section.add(new JLabel("Theme"), c);
         c.gridx = 1;
         section.add(themes, c);
         themes.addActionListener(_ -> {
+            if (updatingThemeSelector) return;
             String choice = (String) themes.getSelectedItem();
             String className = "System";
             if (choice != null) {
@@ -76,7 +80,8 @@ public final class SettingsPage {
                     if (info.getName().equals(choice)) className = info.getClassName();
                 }
             }
-            preferences = new LauncherPreferences(className, preferences.accentColor());
+            preferences = new LauncherPreferences(className, preferences.accentColor(),
+                    preferences.javaExecutablePath());
             persistPreferences();
         });
 
@@ -95,7 +100,8 @@ public final class SettingsPage {
             Color selected = JColorChooser.showDialog(frame, "Choose accent color", initial);
             if (selected != null) {
                 preferences = new LauncherPreferences(preferences.lookAndFeel(),
-                        String.format("#%02X%02X%02X", selected.getRed(), selected.getGreen(), selected.getBlue()));
+                        String.format("#%02X%02X%02X", selected.getRed(), selected.getGreen(), selected.getBlue()),
+                        preferences.javaExecutablePath());
                 persistPreferences();
             }
         });
@@ -167,6 +173,68 @@ public final class SettingsPage {
         return section;
     }
 
+    private static JComponent createJavaRuntimeSettings() {
+        JPanel section = new JPanel(new GridBagLayout());
+        section.setBorder(BorderFactory.createTitledBorder("Java runtime"));
+        GridBagConstraints c = new GridBagConstraints();
+        c.insets = new Insets(5, 6, 5, 6);
+        c.anchor = GridBagConstraints.WEST;
+
+        JLabel selectedPath = new JLabel(javaExecutableLabel(preferences.javaExecutablePath()));
+        selectedPath.setToolTipText(preferences.javaExecutablePath());
+        c.gridx = 0;
+        c.gridy = 0;
+        c.weightx = 1;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        section.add(selectedPath, c);
+
+        JButton browse = new JButton("Choose Java executable…");
+        c.gridx = 1;
+        c.weightx = 0;
+        c.fill = GridBagConstraints.NONE;
+        section.add(browse, c);
+        browse.addActionListener(_ -> {
+            JFileChooser chooser = new JFileChooser();
+            chooser.setDialogTitle("Select a Java executable");
+            chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+            String configuredPath = preferences.javaExecutablePath();
+            if (configuredPath != null && !configuredPath.isBlank()) {
+                Path configured = Path.of(configuredPath);
+                if (Files.isRegularFile(configured)) chooser.setSelectedFile(configured.toFile());
+            }
+            if (chooser.showOpenDialog(frame) != JFileChooser.APPROVE_OPTION) return;
+
+            Path selected = chooser.getSelectedFile().toPath().toAbsolutePath().normalize();
+            if (!Files.isRegularFile(selected)) {
+                JOptionPane.showMessageDialog(frame, "Select an existing Java executable.",
+                        "Invalid Java executable", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            preferences = new LauncherPreferences(preferences.lookAndFeel(), preferences.accentColor(),
+                    selected.toString());
+            persistPreferences();
+            selectedPath.setText(javaExecutableLabel(preferences.javaExecutablePath()));
+            selectedPath.setToolTipText(preferences.javaExecutablePath());
+        });
+
+        JButton useDefault = new JButton("Use default");
+        c.gridx = 0;
+        c.gridy = 1;
+        c.gridwidth = 2;
+        section.add(useDefault, c);
+        useDefault.addActionListener(_ -> {
+            preferences = new LauncherPreferences(preferences.lookAndFeel(), preferences.accentColor(), null);
+            persistPreferences();
+            selectedPath.setText(javaExecutableLabel(null));
+            selectedPath.setToolTipText(null);
+        });
+        return section;
+    }
+
+    private static String javaExecutableLabel(String path) {
+        return path == null || path.isBlank() ? "Default (managed runtime when required)" : path;
+    }
+
     private static JComponent createImportExportSettings() {
         JPanel section = new JPanel(new FlowLayout(FlowLayout.LEFT));
         section.setBorder(BorderFactory.createTitledBorder("Launcher settings"));
@@ -196,6 +264,7 @@ public final class SettingsPage {
         try {
             preferences.save();
             applyPreferences();
+            refreshThemeSelection();
             settingsStatus.setText("Settings saved.");
         } catch (IOException e) {
             logger.error("Failed to save launcher settings: " + e.getMessage());
@@ -292,6 +361,7 @@ public final class SettingsPage {
             preferences.save();
             for (Instance instance : imported.instances()) instance.save();
             applyPreferences();
+            refreshThemeSelection();
             PlayPage.refreshInstanceSelector();
             settingsStatus.setText("Settings and instance configurations imported.");
         } catch (IOException | RuntimeException e) {
@@ -350,4 +420,24 @@ public final class SettingsPage {
     }
 
     private record SettingsExport(LauncherPreferences preferences, List<Instance> instances) {}
+
+    static String themeDisplayName(String storedTheme) {
+        if (storedTheme == null || storedTheme.isBlank() || "System".equals(storedTheme)) return "System";
+        for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
+            if (info.getClassName().equals(storedTheme) || info.getName().equals(storedTheme)) {
+                return info.getName();
+            }
+        }
+        return "System";
+    }
+
+    static void refreshThemeSelection() {
+        if (themeSelector == null) return;
+        updatingThemeSelector = true;
+        try {
+            themeSelector.setSelectedItem(themeDisplayName(preferences.lookAndFeel()));
+        } finally {
+            updatingThemeSelector = false;
+        }
+    }
 }

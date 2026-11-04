@@ -30,11 +30,11 @@ public final class AccountsPage {
     static JComponent create() {
         JPanel screen = new JPanel(new BorderLayout(16, 16));
         screen.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-        JLabel title = new JLabel("Accounts");
-        title.setFont(title.getFont().deriveFont(Font.BOLD, 24f));
+        JLabel title = pageTitle("Accounts");
 
         JPanel accountSidebar = new JPanel(new BorderLayout(8, 8));
         accountSidebar.setPreferredSize(new Dimension(240, 0));
+        accountSidebar.setBorder(BorderFactory.createEmptyBorder(4, 0, 0, 8));
         accountList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         accountList.setCellRenderer(new DefaultListCellRenderer() {
             @Override

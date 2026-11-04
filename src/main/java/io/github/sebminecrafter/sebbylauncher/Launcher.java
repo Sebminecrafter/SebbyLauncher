@@ -82,14 +82,28 @@ public class Launcher {
             int requiredJava = meta.javaVersion() == null ? 8 : meta.javaVersion().majorVersion();
             boolean legacyRuntime = meta.javaVersion() != null
                     && "jre-legacy".equals(meta.javaVersion().component());
-            if (!legacyRuntime && Runtime.version().feature() < requiredJava) {
-                logger.error(version + " needs Java " + requiredJava + ", but the launcher runs on Java "
-                        + Runtime.version().feature());
-                return false;
+            LauncherPreferences preferences = LauncherPreferences.load();
+            String configuredJava = preferences.javaExecutablePath();
+            Path javaExecutable;
+            if (configuredJava != null && !configuredJava.isBlank()) {
+                javaExecutable = Path.of(configuredJava);
+                int selectedJava = JavaRuntime.featureVersion(javaExecutable);
+                if (selectedJava < requiredJava) {
+                    logger.error(version + " needs Java " + requiredJava + ", but the selected runtime is Java "
+                            + selectedJava);
+                    return false;
+                }
+            } else if (legacyRuntime) {
+                javaExecutable = downloader.downloadJavaRuntime(meta.javaVersion());
+            } else {
+                int launcherJava = Runtime.version().feature();
+                if (launcherJava < requiredJava) {
+                    logger.error(version + " needs Java " + requiredJava + ", but the launcher runs on Java "
+                            + launcherJava);
+                    return false;
+                }
+                javaExecutable = Path.of(System.getProperty("java.home"), "bin", "java");
             }
-            Path javaExecutable = legacyRuntime
-                    ? downloader.downloadJavaRuntime(meta.javaVersion())
-                    : Path.of(System.getProperty("java.home"), "bin", "java");
 
             Path clientJar = downloader.downloadClient(meta);
             Path nativesDir = LauncherDirs.VERSIONS.resolve(version).resolve("natives");

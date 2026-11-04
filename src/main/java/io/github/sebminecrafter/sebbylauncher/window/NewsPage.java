@@ -23,7 +23,9 @@ public final class NewsPage {
 
     static JComponent create() {
         JPanel screen = new JPanel(new BorderLayout(8, 8));
-        screen.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
+        screen.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        JPanel header = new JPanel(new BorderLayout(8, 8));
+        header.add(pageTitle("News"), BorderLayout.NORTH);
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JButton home = new JButton("Home");
         home.addActionListener(_ -> loadNews());
@@ -37,7 +39,8 @@ public final class NewsPage {
         toolbar.add(home);
         toolbar.add(copy);
         toolbar.add(browser);
-        screen.add(toolbar, BorderLayout.NORTH);
+        header.add(toolbar, BorderLayout.SOUTH);
+        screen.add(header, BorderLayout.NORTH);
 
         JFXPanel webViewPanel = new JFXPanel();
         screen.add(webViewPanel, BorderLayout.CENTER);

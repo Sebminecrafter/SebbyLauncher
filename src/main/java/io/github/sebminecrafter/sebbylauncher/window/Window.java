@@ -50,6 +50,7 @@ public class Window {
     static JLabel skinImageLabel;
     static JPanel capeList;
     static JLabel settingsStatus;
+    static JComboBox<String> themeSelector;
     static JButton launchButton;
     static boolean refreshingAccounts;
 
@@ -65,14 +66,14 @@ public class Window {
             JOptionPane.showMessageDialog(null, e.getMessage(), "Settings could not be loaded",
                     JOptionPane.ERROR_MESSAGE);
         }
-        applyPreferences();
-
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setIconImage(new ImageIcon(Main.getImageAsset("logo/Sebby32.png")).getImage());
         frame.setUndecorated(false);
         frame.setMinimumSize(new Dimension(minWidth, minHeight));
 
         navigation.setLayout(new BoxLayout(navigation, BoxLayout.Y_AXIS));
+        navigation.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        sidebarFooter.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         sidebar.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Color.GRAY));
         sidebar.add(createSidebarHeader(), BorderLayout.NORTH);
         sidebar.add(navigation, BorderLayout.CENTER);
@@ -103,6 +104,7 @@ public class Window {
         addScreen("Accounts", AccountsPage.create());
         addScreen("Settings", SettingsPage.create());
 
+        applyPreferences();
         frame.pack();
         frame.setSize(minWidth, minHeight);
         frame.setLocationRelativeTo(null);
@@ -180,7 +182,13 @@ public class Window {
         } catch (NumberFormatException e) {
             logger.error("Invalid accent color in launcher settings.");
         }
-        if (frame.isDisplayable()) SwingUtilities.updateComponentTreeUI(frame);
+        SwingUtilities.updateComponentTreeUI(frame);
+    }
+
+    static JLabel pageTitle(String text) {
+        JLabel title = new JLabel(text);
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 24f));
+        return title;
     }
 
     public void start() {
@@ -244,13 +252,15 @@ public class Window {
         button.setIconTextGap(10);
         button.setHorizontalAlignment(SwingConstants.LEFT);
         button.setAlignmentX(Component.LEFT_ALIGNMENT);
-        button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        button.setMargin(new Insets(5, 8, 5, 8));
+        button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
         button.setFocusPainted(false);
         button.addActionListener(_ -> cards.show(content, name));
         nav.add(button);
         if (name.equals("Settings")) {
             sidebarFooter.add(button, BorderLayout.SOUTH);
         } else {
+            if (navigation.getComponentCount() > 0) navigation.add(Box.createVerticalStrut(4));
             navigation.add(button);
         }
         if (name.equals("Play")) {
@@ -267,7 +277,7 @@ public class Window {
             case "Settings" -> new ImageIcon(Main.getImageAsset("pages/settings.png"));
             default -> new ImageIcon(Main.getImageAsset("missing.png"));
         };
-        icon = GuiHelpers.scaleIcon(icon, 32, 32);
+        icon = GuiHelpers.scaleIcon(icon, 24, 24);
         return icon;
     }
 }
